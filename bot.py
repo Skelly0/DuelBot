@@ -116,7 +116,7 @@ async def rules_command(interaction: discord.Interaction):
     
     # Stance Relationships
     embed.add_field(
-        name="⚔️ Stance Advantages (Clockwise)",
+        name="⚔️ Stance Advantages",
         value=(
             "**Bagr** → Radae, Darda\n"
             "**Radae** → Darda, Tigr\n"
@@ -124,6 +124,20 @@ async def rules_command(interaction: discord.Interaction):
             "**Tigr** → Riposje, Tortad\n"
             "**Riposje** → Tortad, Bagr\n"
             "**Tortad** → Bagr, Radae"
+        ),
+        inline=True
+    )
+    
+    # Stance Disadvantages
+    embed.add_field(
+        name="🛡️ Stance Disadvantages",
+        value=(
+            "**Bagr** ← Tortad\n"
+            "**Radae** ← Bagr\n"
+            "**Darda** ← Radae\n"
+            "**Tigr** ← Darda\n"
+            "**Riposje** ← Tigr\n"
+            "**Tortad** ← Riposje"
         ),
         inline=True
     )
