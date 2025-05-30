@@ -180,7 +180,11 @@ async def help_command(interaction: discord.Interaction):
     # Moderator Commands
     embed.add_field(
         name="🔨 Moderator Commands",
-        value="`/end` - Force-end a match (requires manage messages permission)",
+        value=(
+            "`/end` - Force-end a match (requires manage messages permission)\n"
+            "`/add_modifier @player modifier` - Add dice roll modifier to a player (-3 to +3)\n"
+            "`/view_modifiers` - View active dice roll modifiers"
+        ),
         inline=False
     )
     
@@ -518,6 +522,28 @@ async def cancel_command(interaction: discord.Interaction):
 async def end_command(interaction: discord.Interaction):
     """Force-end a match (moderators only)"""
     await handle_end(interaction)
+
+# ============================================================================
+# ADD MODIFIER COMMAND (MODERATOR)
+# ============================================================================
+
+@bot.tree.command(name="add_modifier", description="Add a dice roll modifier to a player (moderators only)")
+@app_commands.describe(
+    player="The player to apply the modifier to",
+    modifier="The modifier value (-3 to +3)"
+)
+async def add_modifier_command(
+    interaction: discord.Interaction,
+    player: discord.Member,
+    modifier: int
+):
+    """Add a dice roll modifier to a player (moderators only)"""
+    await handle_add_modifier(interaction, player, modifier)
+
+@bot.tree.command(name="view_modifiers", description="View active dice roll modifiers (moderators only)")
+async def view_modifiers_command(interaction: discord.Interaction):
+    """View active dice roll modifiers (moderators only)"""
+    await handle_view_modifiers(interaction)
 
 # ============================================================================
 # COMMAND HANDLERS (unchanged from original)
@@ -860,8 +886,20 @@ async def resolve_round(interaction: discord.Interaction, match: Match):
         inline=False
     )
     
+    # Add footer for modifiers
+    footer_parts = []
     if result.adjacency_mod_applied:
-        embed.set_footer(text="Adjacency modifier applied")
+        footer_parts.append("Adjacency modifier applied")
+    if result.custom_mod_applied:
+        mod_details = []
+        if result.player1_modifier != 0:
+            mod_details.append(f"{match.player1.username}: {result.player1_modifier:+d}")
+        if result.player2_modifier != 0:
+            mod_details.append(f"{match.player2.username}: {result.player2_modifier:+d}")
+        footer_parts.append(f"Custom modifiers: {', '.join(mod_details)}")
+    
+    if footer_parts:
+        embed.set_footer(text=" | ".join(footer_parts))
     
     await interaction.followup.send(embed=embed)
     
@@ -1023,6 +1061,107 @@ async def handle_end(interaction: discord.Interaction):
     )
     
     await interaction.response.send_message(embed=embed)
+
+async def handle_add_modifier(interaction: discord.Interaction, player: discord.Member, modifier: int):
+    """Handle add modifier command (mods only)"""
+    # Check if user has manage messages permission (basic mod check)
+    if not interaction.user.guild_permissions.manage_messages:
+        await interaction.response.send_message("Only moderators can add modifiers!", ephemeral=True)
+        return
+    
+    # Validate modifier range
+    if modifier < -3 or modifier > 3:
+        await interaction.response.send_message("Modifier must be between -3 and +3!", ephemeral=True)
+        return
+    
+    channel_id = interaction.channel_id
+    match = bot.active_matches.get(channel_id)
+    
+    if not match:
+        await interaction.response.send_message("No active match in this channel!", ephemeral=True)
+        return
+    
+    # Check if the match has progressed past the first declaration
+    if match.state == GameState.WAITING_FOR_ACCEPT:
+        await interaction.response.send_message("Cannot add modifiers before the match starts!", ephemeral=True)
+        return
+    
+    # Check if both players have made their first declaration
+    if match.current_round == 1 and match.state == GameState.DECLARING_STANCES:
+        if not (match.player1.declared_stances and match.player2.declared_stances):
+            await interaction.response.send_message("Cannot add modifiers until both players have made their first declaration!", ephemeral=True)
+            return
+    
+    # Check if the specified player is part of the match
+    if player.id not in [match.player1.user_id, match.player2.user_id]:
+        await interaction.response.send_message("The specified player is not part of this match!", ephemeral=True)
+        return
+    
+    # Apply the modifier
+    match.custom_modifiers[player.id] = modifier
+    
+    # Create response embed
+    embed = discord.Embed(
+        title="🎲 Modifier Applied",
+        color=discord.Color.blue()
+    )
+    
+    if modifier > 0:
+        embed.description = f"**{player.display_name}** receives a **+{modifier}** modifier to their dice rolls!"
+        embed.color = discord.Color.green()
+    elif modifier < 0:
+        embed.description = f"**{player.display_name}** receives a **{modifier}** modifier to their dice rolls!"
+        embed.color = discord.Color.red()
+    else:
+        embed.description = f"**{player.display_name}**'s modifier has been removed."
+        embed.color = discord.Color.grey()
+    
+    embed.set_footer(text=f"Applied by {interaction.user.display_name}")
+    
+    logger.info(f"Modifier {modifier} applied to player {player.id} in channel {channel_id} by moderator {interaction.user.id}")
+    
+    await interaction.response.send_message(embed=embed)
+
+async def handle_view_modifiers(interaction: discord.Interaction):
+    """Handle view modifiers command (mods only)"""
+    # Check if user has manage messages permission (basic mod check)
+    if not interaction.user.guild_permissions.manage_messages:
+        await interaction.response.send_message("Only moderators can view modifiers!", ephemeral=True)
+        return
+    
+    channel_id = interaction.channel_id
+    match = bot.active_matches.get(channel_id)
+    
+    if not match:
+        await interaction.response.send_message("No active match in this channel!", ephemeral=True)
+        return
+    
+    # Create response embed
+    embed = discord.Embed(
+        title="🎲 Active Modifiers",
+        color=discord.Color.blue()
+    )
+    
+    # Check for modifiers
+    if not match.custom_modifiers:
+        embed.description = "No custom modifiers are currently active."
+        embed.color = discord.Color.grey()
+    else:
+        modifier_list = []
+        for user_id, modifier in match.custom_modifiers.items():
+            if modifier != 0:  # Only show non-zero modifiers
+                player_name = match.player1.username if user_id == match.player1.user_id else match.player2.username
+                modifier_list.append(f"**{player_name}**: {modifier:+d}")
+        
+        if modifier_list:
+            embed.description = "\n".join(modifier_list)
+        else:
+            embed.description = "No active modifiers (all set to 0)."
+            embed.color = discord.Color.grey()
+    
+    embed.set_footer(text=f"Requested by {interaction.user.display_name}")
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 class CancelConfirmView(discord.ui.View):
     def __init__(self, match: Match, user_id: int):

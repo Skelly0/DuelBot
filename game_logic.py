@@ -31,6 +31,9 @@ class RoundResult:
     adjacency_mod_applied: bool = False
     player1_final_roll: int = 0
     player2_final_roll: int = 0
+    custom_mod_applied: bool = False
+    player1_modifier: int = 0
+    player2_modifier: int = 0
 
 @dataclass
 class Match:
@@ -45,6 +48,7 @@ class Match:
     bait_switch: bool = False
     round_history: List[RoundResult] = field(default_factory=list)
     last_stances: Dict[int, str] = field(default_factory=dict)  # user_id -> last stance used
+    custom_modifiers: Dict[int, int] = field(default_factory=dict)  # user_id -> modifier value
 
 class ImperialDuelGame:
     STANCES = ["Bagr", "Radae", "Darda", "Tigr", "Riposje", "Tortad"]
@@ -133,6 +137,16 @@ class ImperialDuelGame:
             p1_final = p1_roll
             p2_final = p2_roll
         
+        # Apply custom modifiers if any
+        p1_modifier = match.custom_modifiers.get(match.player1.user_id, 0)
+        p2_modifier = match.custom_modifiers.get(match.player2.user_id, 0)
+        custom_mod_applied = p1_modifier != 0 or p2_modifier != 0
+        
+        if p1_modifier != 0:
+            p1_final = max(1, min(6, p1_final + p1_modifier))
+        if p2_modifier != 0:
+            p2_final = max(1, min(6, p2_final + p2_modifier))
+        
         # Determine winner
         if p1_final > p2_final:
             winner_id = match.player1.user_id
@@ -160,7 +174,10 @@ class ImperialDuelGame:
             winner_id=winner_id,
             adjacency_mod_applied=adjacency_applied,
             player1_final_roll=p1_final,
-            player2_final_roll=p2_final
+            player2_final_roll=p2_final,
+            custom_mod_applied=custom_mod_applied,
+            player1_modifier=p1_modifier,
+            player2_modifier=p2_modifier
         )
         
         match.round_history.append(result)
