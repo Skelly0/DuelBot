@@ -379,7 +379,7 @@ async def handle_accept(interaction: discord.Interaction):
     embed.add_field(name="Score", value=f"{match.player1.username}: {match.player1.score} | {match.player2.username}: {match.player2.score}", inline=False)
     embed.add_field(name="Next Step", value="Both players declare two stances using `/declare first second`", inline=False)
     
-    await interaction.response.edit_message(embed=embed, content=None)
+    await interaction.response.send_message(embed=embed)
 
 async def handle_stance_declaration(interaction: discord.Interaction, first: str, second: str):
     """Handle stance declaration"""
@@ -424,15 +424,20 @@ async def handle_stance_declaration(interaction: discord.Interaction, first: str
     else:
         match.player2.declared_stances = [first, second]
     
-    await interaction.response.send_message(f"**{interaction.user.display_name}** declared: **{first}** and **{second}**")
+    # Send secret confirmation to the player
+    await interaction.response.send_message(f"✅ You secretly declared: **{first}** and **{second}**", ephemeral=True)
+    
+    # Send public notification that player has declared (without revealing stances)
+    await interaction.followup.send(f"🔒 **{interaction.user.display_name}** has locked in their stance declaration!")
     
     # Check if both players have declared
     if match.player1.declared_stances and match.player2.declared_stances:
         match.state = GameState.PICKING_STANCES
         
+        # Reveal both declarations simultaneously
         embed = discord.Embed(
-            title="🎯 Secret Pick Phase",
-            description="Both players have declared their stances. Now make your secret picks!",
+            title="🎯 Stance Declarations Revealed!",
+            description="Both players have declared their stances. Here are the options:",
             color=discord.Color.blue()
         )
         embed.add_field(
@@ -441,7 +446,7 @@ async def handle_stance_declaration(interaction: discord.Interaction, first: str
             inline=False
         )
         embed.add_field(
-            name=f"{match.player2.username}'s options", 
+            name=f"{match.player2.username}'s options",
             value=" | ".join(match.player2.declared_stances),
             inline=False
         )
