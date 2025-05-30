@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from typing import Dict, Optional
 import asyncio
 
-from game_logic import HexDuelGame, Match, Player, GameState
+from game_logic import ImperialDuelGame, Match, Player, GameState
 
 # Load environment variables
 load_dotenv()
@@ -17,7 +17,7 @@ class DuelBot(commands.Bot):
         intents.message_content = False  # We don't need message content for slash commands
         super().__init__(command_prefix='!', intents=intents)
         
-        self.game = HexDuelGame()
+        self.game = ImperialDuelGame()
         self.active_matches: Dict[int, Match] = {}  # channel_id -> Match
         
     async def setup_hook(self):
@@ -35,12 +35,12 @@ bot = DuelBot()
 # HELP COMMAND
 # ============================================================================
 
-@bot.tree.command(name="help", description="Show help for Hex-Duel commands")
+@bot.tree.command(name="help", description="Show help for Imperial Duel commands")
 async def help_command(interaction: discord.Interaction):
     """Display comprehensive help for all duel commands"""
     
     embed = discord.Embed(
-        title="⚔️ Hex-Duel Bot Commands",
+        title="⚔️ Imperial Duel Bot Commands",
         description="A strategic dueling game with six stances arranged in a hexagon",
         color=discord.Color.blue()
     )
@@ -91,12 +91,12 @@ async def help_command(interaction: discord.Interaction):
 # RULES COMMAND
 # ============================================================================
 
-@bot.tree.command(name="rules", description="Show detailed Hex-Duel rules and stance relationships")
+@bot.tree.command(name="rules", description="Show detailed Imperial Duel rules and stance relationships")
 async def rules_command(interaction: discord.Interaction):
     """Display detailed game rules"""
     
     embed = discord.Embed(
-        title="📜 Hex-Duel Rules",
+        title="📜 Imperial Duel Rules",
         description="The complete guide to strategic stance-based dueling",
         color=discord.Color.gold()
     )
@@ -159,7 +159,7 @@ async def rules_command(interaction: discord.Interaction):
 # CHALLENGE COMMAND
 # ============================================================================
 
-@bot.tree.command(name="challenge", description="Challenge someone to a Hex-Duel")
+@bot.tree.command(name="challenge", description="Challenge someone to a Imperial Duel")
 @app_commands.describe(
     opponent="The player to challenge",
     best_of="Best of how many rounds (3, 5, or 7)",
@@ -323,7 +323,7 @@ async def handle_challenge(interaction: discord.Interaction, opponent: discord.M
     
     # Create challenge embed
     embed = discord.Embed(
-        title="⚔️ Hex-Duel Challenge!",
+        title="⚔️ Imperial Duel Challenge!",
         description=f"{interaction.user.mention} challenges {opponent.mention} to a duel!",
         color=discord.Color.orange()
     )
@@ -355,7 +355,7 @@ async def handle_accept(interaction: discord.Interaction):
     match.state = GameState.DECLARING_STANCES
     
     embed = discord.Embed(
-        title="⚔️ Hex-Duel Match - LIVE!",
+        title="⚔️ Imperial Duel Match - LIVE!",
         description=f"{match.player1.username} vs {match.player2.username}",
         color=discord.Color.green()
     )

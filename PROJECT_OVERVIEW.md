@@ -1,4 +1,4 @@
-# Hex-Duel Discord Bot - Project Overview
+# Imperial Duel Discord Bot - Project Overview
 
 ## 🎯 Project Summary
 
@@ -146,6 +146,6 @@ The bot successfully implements all requirements from the original brief:
 
 ## 🚀 Ready to Duel!
 
-The Hex-Duel Discord Bot is complete and ready for deployment. Users can start dueling immediately after setup, with a smooth and engaging experience that faithfully implements the original game rules while adding modern Discord bot conveniences.
+The Imperial Duel Discord Bot is complete and ready for deployment. Users can start dueling immediately after setup, with a smooth and engaging experience that faithfully implements the original game rules while adding modern Discord bot conveniences.
 
 **Have fun dueling!** ⚔️

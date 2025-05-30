@@ -46,7 +46,7 @@ class Match:
     round_history: List[RoundResult] = field(default_factory=list)
     last_stances: Dict[int, str] = field(default_factory=dict)  # user_id -> last stance used
 
-class HexDuelGame:
+class ImperialDuelGame:
     STANCES = ["Bagr", "Radae", "Darda", "Tigr", "Riposje", "Tortad"]
     
     def __init__(self):

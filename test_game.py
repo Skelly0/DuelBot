@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Simple test script to verify the hex-duel game logic works correctly.
+Simple test script to verify the Imperial duel game logic works correctly.
 Run this to test the core mechanics before deploying the bot.
 """
 
-from game_logic import HexDuelGame, Match, Player, GameState
+from game_logic import ImperialDuelGame, Match, Player, GameState
 import random
 
 def test_stance_relationships():
     """Test that stance relationships work as expected"""
-    game = HexDuelGame()
+    game = ImperialDuelGame()
     
     print("=== Testing Stance Relationships ===")
     
@@ -31,7 +31,7 @@ def test_stance_relationships():
 
 def test_adjacency():
     """Test adjacency detection"""
-    game = HexDuelGame()
+    game = ImperialDuelGame()
     
     print("=== Testing Adjacency ===")
     
@@ -61,7 +61,7 @@ def test_adjacency():
 
 def test_dice_rolling():
     """Test dice rolling with advantage/disadvantage"""
-    game = HexDuelGame()
+    game = ImperialDuelGame()
     
     print("=== Testing Dice Rolling ===")
     
@@ -79,7 +79,7 @@ def test_dice_rolling():
 
 def test_full_round():
     """Test a complete round resolution"""
-    game = HexDuelGame()
+    game = ImperialDuelGame()
     
     print("=== Testing Full Round ===")
     
@@ -120,7 +120,7 @@ def test_full_round():
 
 def test_no_repeat():
     """Test no-repeat rule"""
-    game = HexDuelGame()
+    game = ImperialDuelGame()
     
     print("=== Testing No-Repeat Rule ===")
     
@@ -151,7 +151,7 @@ def test_no_repeat():
 
 def main():
     """Run all tests"""
-    print("🎯 Hex-Duel Game Logic Tests")
+    print("🎯 Imperial Duel Game Logic Tests")
     print("=" * 40)
     
     # Set random seed for reproducible tests

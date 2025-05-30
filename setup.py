@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Setup script for the Hex-Duel Discord Bot.
+Setup script for the Imperial Duel Discord Bot.
 This script helps users set up the bot environment and check dependencies.
 """
 
@@ -126,7 +126,7 @@ def show_next_steps():
 
 def main():
     """Main setup function"""
-    print("🎯 Hex-Duel Discord Bot Setup")
+    print("🎯 Imperial Duel Discord Bot Setup")
     print("=" * 40)
     
     # Check Python version

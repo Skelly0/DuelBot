@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get your Hex-Duel Discord bot up and running in 5 minutes!
+Get your Imperial Duel Discord bot up and running in 5 minutes!
 
 ## 1. Prerequisites
 
