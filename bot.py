@@ -31,70 +31,256 @@ class DuelBot(commands.Bot):
 
 bot = DuelBot()
 
-@bot.tree.command(name="duel", description="Hex-Duel commands")
+# ============================================================================
+# HELP COMMAND
+# ============================================================================
+
+@bot.tree.command(name="help", description="Show help for Hex-Duel commands")
+async def help_command(interaction: discord.Interaction):
+    """Display comprehensive help for all duel commands"""
+    
+    embed = discord.Embed(
+        title="⚔️ Hex-Duel Bot Commands",
+        description="A strategic dueling game with six stances arranged in a hexagon",
+        color=discord.Color.blue()
+    )
+    
+    # Basic Commands
+    embed.add_field(
+        name="🎯 Basic Commands",
+        value=(
+            "`/challenge @opponent` - Challenge someone to a duel\n"
+            "`/accept` - Accept a pending challenge\n"
+            "`/status` - Check current match status\n"
+            "`/cancel` - Cancel your current match\n"
+            "`/rules` - Show detailed game rules"
+        ),
+        inline=False
+    )
+    
+    # Game Commands
+    embed.add_field(
+        name="⚔️ During a Match",
+        value=(
+            "`/declare first second` - Declare two stance options\n"
+            "`/pick stance` - Secretly pick your stance\n"
+            "`/switch old new` - Switch a stance (if bait-switch enabled)"
+        ),
+        inline=False
+    )
+    
+    # Stances
+    embed.add_field(
+        name="🛡️ The Six Stances",
+        value="**Bagr** • **Radae** • **Darda** • **Tigr** • **Riposje** • **Tortad**",
+        inline=False
+    )
+    
+    # Moderator Commands
+    embed.add_field(
+        name="🔨 Moderator Commands",
+        value="`/end` - Force-end a match (requires manage messages permission)",
+        inline=False
+    )
+    
+    embed.set_footer(text="Use /rules for detailed game mechanics and stance relationships")
+    
+    await interaction.response.send_message(embed=embed)
+
+# ============================================================================
+# RULES COMMAND
+# ============================================================================
+
+@bot.tree.command(name="rules", description="Show detailed Hex-Duel rules and stance relationships")
+async def rules_command(interaction: discord.Interaction):
+    """Display detailed game rules"""
+    
+    embed = discord.Embed(
+        title="📜 Hex-Duel Rules",
+        description="The complete guide to strategic stance-based dueling",
+        color=discord.Color.gold()
+    )
+    
+    # Basic Rules
+    embed.add_field(
+        name="🎯 How to Play",
+        value=(
+            "1. **Challenge** someone to a best-of-3/5/7 match\n"
+            "2. Each round: **Declare** two stances publicly\n"
+            "3. **Pick** one of your declared stances secretly\n"
+            "4. **Roll** dice with advantage/disadvantage based on matchup\n"
+            "5. Higher roll wins the round!"
+        ),
+        inline=False
+    )
+    
+    # Stance Relationships
+    embed.add_field(
+        name="⚔️ Stance Advantages (Clockwise)",
+        value=(
+            "**Bagr** → Radae, Darda\n"
+            "**Radae** → Darda, Tigr\n"
+            "**Darda** → Tigr, Riposje\n"
+            "**Tigr** → Riposje, Tortad\n"
+            "**Riposje** → Tortad, Bagr\n"
+            "**Tortad** → Bagr, Radae"
+        ),
+        inline=True
+    )
+    
+    # Dice Rules
+    embed.add_field(
+        name="🎲 Dice Mechanics",
+        value=(
+            "**Advantage**: Roll 2d6, keep higher\n"
+            "**Neutral**: Roll 1d6\n"
+            "**Disadvantage**: Roll 2d6, keep lower\n"
+            "\n*Ties go to the challenger*"
+        ),
+        inline=True
+    )
+    
+    # Optional Rules
+    embed.add_field(
+        name="🔧 Optional Variants",
+        value=(
+            "**No-Repeat**: Can't use same stance twice in a row\n"
+            "**Adjacency Mod**: +1 for adjacent, -1 for opposite stances\n"
+            "**Bait-Switch**: Change one declared stance before picking"
+        ),
+        inline=False
+    )
+    
+    embed.set_footer(text="Master the hexagon to become the ultimate duelist!")
+    
+    await interaction.response.send_message(embed=embed)
+
+# ============================================================================
+# CHALLENGE COMMAND
+# ============================================================================
+
+@bot.tree.command(name="challenge", description="Challenge someone to a Hex-Duel")
 @app_commands.describe(
-    action="The duel action to perform",
-    opponent="The player to challenge (for challenge action)",
+    opponent="The player to challenge",
     best_of="Best of how many rounds (3, 5, or 7)",
     no_repeat="Forbid using same stance twice in a row",
     adjacency_mod="Apply +1/-1 modifier for adjacent/opposite stances",
-    bait_switch="Allow one-time stance switching after declaration",
-    first="First stance option",
-    second="Second stance option",
-    choice="Your secret stance choice",
-    old="Old stance to replace (for switch)",
-    new="New stance to replace with (for switch)"
+    bait_switch="Allow one-time stance switching after declaration"
 )
-async def duel_command(
+async def challenge_command(
     interaction: discord.Interaction,
-    action: str,
-    opponent: Optional[discord.Member] = None,
-    best_of: Optional[int] = 3,
-    no_repeat: Optional[bool] = False,
-    adjacency_mod: Optional[bool] = False,
-    bait_switch: Optional[bool] = False,
-    first: Optional[str] = None,
-    second: Optional[str] = None,
-    choice: Optional[str] = None,
-    old: Optional[str] = None,
-    new: Optional[str] = None
+    opponent: discord.Member,
+    best_of: int = 3,
+    no_repeat: bool = False,
+    adjacency_mod: bool = False,
+    bait_switch: bool = False
 ):
-    """Main duel command handler"""
-    
-    if action == "challenge":
-        await handle_challenge(interaction, opponent, best_of, no_repeat, adjacency_mod, bait_switch)
-    elif action == "accept":
-        await handle_accept(interaction)
-    elif action == "stance":
-        await handle_stance_declaration(interaction, first, second)
-    elif action == "pick":
-        await handle_stance_pick(interaction, choice)
-    elif action == "switch":
-        await handle_stance_switch(interaction, old, new)
-    elif action == "status":
-        await handle_status(interaction)
-    elif action == "cancel":
-        await handle_cancel(interaction)
-    elif action == "end":
-        await handle_end(interaction)
-    else:
-        await interaction.response.send_message("Invalid action. Use: challenge, accept, stance, pick, switch, status, cancel, or end", ephemeral=True)
+    """Challenge another player to a duel"""
+    await handle_challenge(interaction, opponent, best_of, no_repeat, adjacency_mod, bait_switch)
 
-# Add choices for the action parameter
-@duel_command.autocomplete('action')
-async def action_autocomplete(interaction: discord.Interaction, current: str):
-    actions = ["challenge", "accept", "stance", "pick", "switch", "status", "cancel", "end"]
-    return [app_commands.Choice(name=action, value=action) for action in actions if current.lower() in action.lower()]
+# ============================================================================
+# ACCEPT COMMAND
+# ============================================================================
 
-# Add choices for stance parameters
-@duel_command.autocomplete('first')
-@duel_command.autocomplete('second')
-@duel_command.autocomplete('choice')
-@duel_command.autocomplete('old')
-@duel_command.autocomplete('new')
-async def stance_autocomplete(interaction: discord.Interaction, current: str):
+@bot.tree.command(name="accept", description="Accept a pending duel challenge")
+async def accept_command(interaction: discord.Interaction):
+    """Accept a pending challenge"""
+    await handle_accept(interaction)
+
+# ============================================================================
+# DECLARE COMMAND
+# ============================================================================
+
+@bot.tree.command(name="declare", description="Declare your two stance options for the round")
+@app_commands.describe(
+    first="Your first stance option",
+    second="Your second stance option"
+)
+async def declare_command(
+    interaction: discord.Interaction,
+    first: str,
+    second: str
+):
+    """Declare two stance options"""
+    await handle_stance_declaration(interaction, first, second)
+
+@declare_command.autocomplete('first')
+@declare_command.autocomplete('second')
+async def declare_stance_autocomplete(interaction: discord.Interaction, current: str):
     stances = bot.game.STANCES
     return [app_commands.Choice(name=stance, value=stance) for stance in stances if current.lower() in stance.lower()]
+
+# ============================================================================
+# PICK COMMAND
+# ============================================================================
+
+@bot.tree.command(name="pick", description="Secretly pick one of your declared stances")
+@app_commands.describe(choice="Your secret stance choice")
+async def pick_command(
+    interaction: discord.Interaction,
+    choice: str
+):
+    """Make your secret stance pick"""
+    await handle_stance_pick(interaction, choice)
+
+@pick_command.autocomplete('choice')
+async def pick_stance_autocomplete(interaction: discord.Interaction, current: str):
+    stances = bot.game.STANCES
+    return [app_commands.Choice(name=stance, value=stance) for stance in stances if current.lower() in stance.lower()]
+
+# ============================================================================
+# SWITCH COMMAND
+# ============================================================================
+
+@bot.tree.command(name="switch", description="Switch one of your declared stances (bait-switch variant)")
+@app_commands.describe(
+    old="The stance to replace",
+    new="The new stance to use instead"
+)
+async def switch_command(
+    interaction: discord.Interaction,
+    old: str,
+    new: str
+):
+    """Switch one of your declared stances"""
+    await handle_stance_switch(interaction, old, new)
+
+@switch_command.autocomplete('old')
+@switch_command.autocomplete('new')
+async def switch_stance_autocomplete(interaction: discord.Interaction, current: str):
+    stances = bot.game.STANCES
+    return [app_commands.Choice(name=stance, value=stance) for stance in stances if current.lower() in stance.lower()]
+
+# ============================================================================
+# STATUS COMMAND
+# ============================================================================
+
+@bot.tree.command(name="status", description="Check the status of the current match")
+async def status_command(interaction: discord.Interaction):
+    """Check current match status"""
+    await handle_status(interaction)
+
+# ============================================================================
+# CANCEL COMMAND
+# ============================================================================
+
+@bot.tree.command(name="cancel", description="Cancel the current match")
+async def cancel_command(interaction: discord.Interaction):
+    """Cancel the current match"""
+    await handle_cancel(interaction)
+
+# ============================================================================
+# END COMMAND (MODERATOR)
+# ============================================================================
+
+@bot.tree.command(name="end", description="Force-end a match (moderators only)")
+async def end_command(interaction: discord.Interaction):
+    """Force-end a match (moderators only)"""
+    await handle_end(interaction)
+
+# ============================================================================
+# COMMAND HANDLERS (unchanged from original)
+# ============================================================================
 
 async def handle_challenge(interaction: discord.Interaction, opponent: discord.Member, best_of: int, no_repeat: bool, adjacency_mod: bool, bait_switch: bool):
     """Handle challenge command"""
@@ -144,7 +330,7 @@ async def handle_challenge(interaction: discord.Interaction, opponent: discord.M
     embed.add_field(name="Format", value=f"Best of {best_of}", inline=True)
     embed.add_field(name="Options", value=format_options(no_repeat, adjacency_mod, bait_switch), inline=True)
     embed.add_field(name="Status", value="⏳ Waiting for acceptance", inline=False)
-    embed.set_footer(text=f"{opponent.display_name}, use '/duel accept' to accept this challenge!")
+    embed.set_footer(text=f"{opponent.display_name}, use '/accept' to accept this challenge!")
     
     await interaction.response.send_message(content=f"{opponent.mention}", embed=embed)
 
@@ -177,7 +363,7 @@ async def handle_accept(interaction: discord.Interaction):
     embed.add_field(name="Options", value=format_options(match.no_repeat, match.adjacency_mod, match.bait_switch), inline=True)
     embed.add_field(name="Round", value=f"{match.current_round}", inline=True)
     embed.add_field(name="Score", value=f"{match.player1.username}: {match.player1.score} | {match.player2.username}: {match.player2.score}", inline=False)
-    embed.add_field(name="Next Step", value="Both players declare two stances using `/duel stance first second`", inline=False)
+    embed.add_field(name="Next Step", value="Both players declare two stances using `/declare first second`", inline=False)
     
     await interaction.response.edit_message(embed=embed, content=None)
 
@@ -249,11 +435,11 @@ async def handle_stance_declaration(interaction: discord.Interaction, first: str
         if match.bait_switch:
             embed.add_field(
                 name="Bait & Switch",
-                value="You may use `/duel switch old new` once before picking!",
+                value="You may use `/switch old new` once before picking!",
                 inline=False
             )
         
-        embed.set_footer(text="Use '/duel pick choice' to make your secret selection!")
+        embed.set_footer(text="Use '/pick choice' to make your secret selection!")
         
         await interaction.followup.send(embed=embed)
 
