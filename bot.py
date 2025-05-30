@@ -775,7 +775,7 @@ class CancelConfirmView(discord.ui.View):
     @discord.ui.button(label="Yes, Cancel Match", style=discord.ButtonStyle.danger)
     async def confirm_cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Only the person who initiated the cancel can confirm!", ephemeral=True)
+            await interaction.followup.send("Only the person who initiated the cancel can confirm!", ephemeral=True)
             return
         
         # Cancel the match
@@ -792,7 +792,7 @@ class CancelConfirmView(discord.ui.View):
     @discord.ui.button(label="No, Keep Playing", style=discord.ButtonStyle.secondary)
     async def cancel_cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("Only the person who initiated the cancel can confirm!", ephemeral=True)
+            await interaction.followup.send("Only the person who initiated the cancel can confirm!", ephemeral=True)
             return
         
         await interaction.response.edit_message(content="Match continues!", view=None)
