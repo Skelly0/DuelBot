@@ -53,7 +53,8 @@ async def help_command(interaction: discord.Interaction):
             "`/accept` - Accept a pending challenge\n"
             "`/status` - Check current match status\n"
             "`/cancel` - Cancel your current match\n"
-            "`/rules` - Show detailed game rules"
+            "`/rules` - Show detailed game rules\n"
+            "`/rules_image` - Post the rules image"
         ),
         inline=False
     )
@@ -168,6 +169,42 @@ async def rules_command(interaction: discord.Interaction):
     embed.set_footer(text="Master the hexagon to become the ultimate duelist!")
     
     await interaction.response.send_message(embed=embed)
+
+# ============================================================================
+# RULES IMAGE COMMAND
+# ============================================================================
+
+@bot.tree.command(name="rules_image", description="Post the Imperial Duel rules image")
+async def rules_image_command(interaction: discord.Interaction):
+    """Post the rules image"""
+    try:
+        # Check if the image file exists
+        image_path = "rulesimage.png"
+        if not os.path.exists(image_path):
+            await interaction.response.send_message(
+                "❌ Rules image not found! Please make sure `rulesimage.png` exists in the bot directory.",
+                ephemeral=True
+            )
+            return
+        
+        # Create file object and send
+        with open(image_path, 'rb') as f:
+            file = discord.File(f, filename="rulesimage.png")
+            embed = discord.Embed(
+                title="📜 Imperial Duel Rules",
+                description="Visual guide to Imperial Duel mechanics and stance relationships",
+                color=discord.Color.gold()
+            )
+            embed.set_image(url="attachment://rulesimage.png")
+            embed.set_footer(text="Use /rules for detailed text-based rules")
+            
+            await interaction.response.send_message(embed=embed, file=file)
+            
+    except Exception as e:
+        await interaction.response.send_message(
+            f"❌ Error loading rules image: {str(e)}",
+            ephemeral=True
+        )
 
 # ============================================================================
 # CHALLENGE COMMAND
