@@ -1,15 +1,21 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 import os
 from dotenv import load_dotenv
 from typing import Dict, Optional
 import asyncio
+import time
+import logging
 
 from game_logic import ImperialDuelGame, Match, Player, GameState
 
 # Load environment variables
 load_dotenv()
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class DuelBot(commands.Bot):
     def __init__(self):
@@ -19,15 +25,76 @@ class DuelBot(commands.Bot):
         
         self.game = ImperialDuelGame()
         self.active_matches: Dict[int, Match] = {}  # channel_id -> Match
+        self.match_locks: Dict[int, asyncio.Lock] = {}  # channel_id -> Lock for concurrency protection
+        self.match_timestamps: Dict[int, float] = {}  # channel_id -> creation timestamp
+        
+        # Match cleanup configuration
+        self.MATCH_TIMEOUT_HOURS = 24  # Cleanup matches older than 24 hours
+        self.INACTIVE_TIMEOUT_HOURS = 2  # Cleanup matches inactive for 2 hours
         
     async def setup_hook(self):
         """Called when the bot is starting up"""
         await self.tree.sync()
         print(f"Synced slash commands for {self.user}")
+        
+        # Start the cleanup task
+        self.cleanup_matches.start()
+        logger.info("Started match cleanup task")
     
     async def on_ready(self):
         print(f'{self.user} has connected to Discord!')
         print(f'Bot is in {len(self.guilds)} guilds')
+        logger.info(f"Bot ready with {len(self.active_matches)} active matches")
+    
+    @tasks.loop(minutes=30)  # Run cleanup every 30 minutes
+    async def cleanup_matches(self):
+        """Clean up abandoned or timed-out matches"""
+        current_time = time.time()
+        channels_to_remove = []
+        
+        for channel_id, match in self.active_matches.items():
+            match_age_hours = (current_time - self.match_timestamps.get(channel_id, current_time)) / 3600
+            
+            # Check if match is too old
+            if match_age_hours > self.MATCH_TIMEOUT_HOURS:
+                channels_to_remove.append(channel_id)
+                logger.info(f"Cleaning up match in channel {channel_id} - exceeded timeout ({match_age_hours:.1f}h)")
+                continue
+            
+            # Check if match is stuck in waiting state for too long
+            if (match.state == GameState.WAITING_FOR_ACCEPT and
+                match_age_hours > 1):  # 1 hour timeout for acceptance
+                channels_to_remove.append(channel_id)
+                logger.info(f"Cleaning up unaccepted match in channel {channel_id} ({match_age_hours:.1f}h)")
+                continue
+            
+            # Check if match is stuck in declaration/picking phase
+            if (match.state in [GameState.DECLARING_STANCES, GameState.PICKING_STANCES] and
+                match_age_hours > self.INACTIVE_TIMEOUT_HOURS):
+                channels_to_remove.append(channel_id)
+                logger.info(f"Cleaning up inactive match in channel {channel_id} ({match_age_hours:.1f}h)")
+        
+        # Remove identified matches
+        for channel_id in channels_to_remove:
+            self._cleanup_match(channel_id)
+        
+        if channels_to_remove:
+            logger.info(f"Cleaned up {len(channels_to_remove)} matches. {len(self.active_matches)} matches remaining")
+    
+    def _cleanup_match(self, channel_id: int):
+        """Clean up a single match and its associated data"""
+        if channel_id in self.active_matches:
+            del self.active_matches[channel_id]
+        if channel_id in self.match_locks:
+            del self.match_locks[channel_id]
+        if channel_id in self.match_timestamps:
+            del self.match_timestamps[channel_id]
+    
+    async def _get_match_lock(self, channel_id: int) -> asyncio.Lock:
+        """Get or create a lock for the given channel"""
+        if channel_id not in self.match_locks:
+            self.match_locks[channel_id] = asyncio.Lock()
+        return self.match_locks[channel_id]
 
 bot = DuelBot()
 
@@ -181,6 +248,7 @@ async def rules_image_command(interaction: discord.Interaction):
         # Check if the image file exists
         image_path = "rulesimage.png"
         if not os.path.exists(image_path):
+            logger.warning(f"Rules image not found at {image_path}")
             await interaction.response.send_message(
                 "❌ Rules image not found! Please make sure `rulesimage.png` exists in the bot directory.",
                 ephemeral=True
@@ -199,10 +267,30 @@ async def rules_image_command(interaction: discord.Interaction):
             embed.set_footer(text="Use /rules for detailed text-based rules")
             
             await interaction.response.send_message(embed=embed, file=file)
+            logger.info(f"Rules image posted in channel {interaction.channel_id}")
             
-    except Exception as e:
+    except FileNotFoundError:
+        logger.error(f"Rules image file not found: {image_path}")
         await interaction.response.send_message(
-            f"❌ Error loading rules image: {str(e)}",
+            "❌ Rules image file not found!",
+            ephemeral=True
+        )
+    except PermissionError:
+        logger.error(f"Permission denied accessing rules image: {image_path}")
+        await interaction.response.send_message(
+            "❌ Permission denied accessing rules image!",
+            ephemeral=True
+        )
+    except discord.HTTPException as e:
+        logger.error(f"Discord API error posting rules image: {e}")
+        await interaction.response.send_message(
+            "❌ Error uploading image to Discord!",
+            ephemeral=True
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error loading rules image: {e}")
+        await interaction.response.send_message(
+            f"❌ Unexpected error: {str(e)}",
             ephemeral=True
         )
 
@@ -352,25 +440,32 @@ async def handle_challenge(interaction: discord.Interaction, opponent: discord.M
         return
     
     channel_id = interaction.channel_id
-    if channel_id in bot.active_matches:
-        await interaction.response.send_message("There's already an active match in this channel!", ephemeral=True)
-        return
     
-    # Create new match
-    player1 = Player(user_id=interaction.user.id, username=interaction.user.display_name)
-    player2 = Player(user_id=opponent.id, username=opponent.display_name)
-    
-    match = Match(
-        channel_id=channel_id,
-        player1=player1,
-        player2=player2,
-        best_of=best_of,
-        no_repeat=no_repeat,
-        adjacency_mod=adjacency_mod,
-        bait_switch=bait_switch
-    )
-    
-    bot.active_matches[channel_id] = match
+    # Use lock to prevent race conditions
+    async with await bot._get_match_lock(channel_id):
+        if channel_id in bot.active_matches:
+            await interaction.response.send_message("There's already an active match in this channel!", ephemeral=True)
+            return
+        
+        # Create new match
+        player1 = Player(user_id=interaction.user.id, username=interaction.user.display_name)
+        player2 = Player(user_id=opponent.id, username=opponent.display_name)
+        
+        match = Match(
+            channel_id=channel_id,
+            player1=player1,
+            player2=player2,
+            best_of=best_of,
+            no_repeat=no_repeat,
+            adjacency_mod=adjacency_mod,
+            bait_switch=bait_switch
+        )
+        
+        # Store match and timestamp
+        bot.active_matches[channel_id] = match
+        bot.match_timestamps[channel_id] = time.time()
+        
+        logger.info(f"Created new match in channel {channel_id}: {player1.username} vs {player2.username}")
     
     # Create challenge embed
     embed = discord.Embed(
@@ -388,22 +483,26 @@ async def handle_challenge(interaction: discord.Interaction, opponent: discord.M
 async def handle_accept(interaction: discord.Interaction):
     """Handle accept command"""
     channel_id = interaction.channel_id
-    match = bot.active_matches.get(channel_id)
     
-    if not match:
-        await interaction.response.send_message("No active challenge in this channel!", ephemeral=True)
-        return
-    
-    if match.state != GameState.WAITING_FOR_ACCEPT:
-        await interaction.response.send_message("This match has already been accepted!", ephemeral=True)
-        return
-    
-    if interaction.user.id != match.player2.user_id:
-        await interaction.response.send_message("Only the challenged player can accept!", ephemeral=True)
-        return
-    
-    # Accept the challenge
-    match.state = GameState.DECLARING_STANCES
+    # Use lock to prevent race conditions
+    async with await bot._get_match_lock(channel_id):
+        match = bot.active_matches.get(channel_id)
+        
+        if not match:
+            await interaction.response.send_message("No active challenge in this channel!", ephemeral=True)
+            return
+        
+        if match.state != GameState.WAITING_FOR_ACCEPT:
+            await interaction.response.send_message("This match has already been accepted!", ephemeral=True)
+            return
+        
+        if interaction.user.id != match.player2.user_id:
+            await interaction.response.send_message("Only the challenged player can accept!", ephemeral=True)
+            return
+        
+        # Accept the challenge
+        match.state = GameState.DECLARING_STANCES
+        logger.info(f"Match accepted in channel {channel_id}: {match.player1.username} vs {match.player2.username}")
     
     embed = discord.Embed(
         title="⚔️ Imperial Duel Match - LIVE!",
@@ -433,33 +532,45 @@ async def handle_stance_declaration(interaction: discord.Interaction, first: str
         return
     
     channel_id = interaction.channel_id
-    match = bot.active_matches.get(channel_id)
-    
-    if not match:
-        await interaction.response.send_message("No active match in this channel!", ephemeral=True)
-        return
-    
-    if match.state != GameState.DECLARING_STANCES:
-        await interaction.response.send_message("Not currently in stance declaration phase!", ephemeral=True)
-        return
-    
     user_id = interaction.user.id
-    if user_id not in [match.player1.user_id, match.player2.user_id]:
-        await interaction.response.send_message("You are not part of this match!", ephemeral=True)
-        return
     
-    # Check no_repeat rule
-    if match.no_repeat:
-        last_stance = match.last_stances.get(user_id)
-        if last_stance in [first, second]:
-            await interaction.response.send_message(f"You cannot use {last_stance} again (no-repeat rule)!", ephemeral=True)
+    # Use lock to prevent race conditions
+    async with await bot._get_match_lock(channel_id):
+        match = bot.active_matches.get(channel_id)
+        
+        if not match:
+            await interaction.response.send_message("No active match in this channel!", ephemeral=True)
             return
-    
-    # Set declared stances
-    if user_id == match.player1.user_id:
-        match.player1.declared_stances = [first, second]
-    else:
-        match.player2.declared_stances = [first, second]
+        
+        if match.state != GameState.DECLARING_STANCES:
+            await interaction.response.send_message("Not currently in stance declaration phase!", ephemeral=True)
+            return
+        
+        if user_id not in [match.player1.user_id, match.player2.user_id]:
+            await interaction.response.send_message("You are not part of this match!", ephemeral=True)
+            return
+        
+        # Check if player has already declared
+        player = match.player1 if user_id == match.player1.user_id else match.player2
+        if player.declared_stances:
+            await interaction.response.send_message("You have already declared your stances!", ephemeral=True)
+            return
+        
+        # Check no_repeat rule
+        if match.no_repeat:
+            last_stance = match.last_stances.get(user_id)
+            if last_stance in [first, second]:
+                await interaction.response.send_message(f"You cannot use {last_stance} again (no-repeat rule)!", ephemeral=True)
+                return
+        
+        # Set declared stances
+        player.declared_stances = [first, second]
+        
+        # Check if both players have declared
+        both_declared = match.player1.declared_stances and match.player2.declared_stances
+        if both_declared:
+            match.state = GameState.PICKING_STANCES
+            logger.info(f"Both players declared stances in channel {channel_id}, moving to picking phase")
     
     # Send secret confirmation to the player
     await interaction.response.send_message(f"✅ You secretly declared: **{first}** and **{second}**", ephemeral=True)
@@ -467,10 +578,8 @@ async def handle_stance_declaration(interaction: discord.Interaction, first: str
     # Send public notification that player has declared (without revealing stances)
     await interaction.followup.send(f"🔒 **{interaction.user.display_name}** has locked in their stance declaration!")
     
-    # Check if both players have declared
-    if match.player1.declared_stances and match.player2.declared_stances:
-        match.state = GameState.PICKING_STANCES
-        
+    # If both players have declared, reveal declarations
+    if both_declared:
         # Reveal both declarations simultaneously
         embed = discord.Embed(
             title="🎯 Stance Declarations Revealed!",
@@ -563,41 +672,49 @@ async def handle_stance_pick(interaction: discord.Interaction, choice: str):
         return
     
     channel_id = interaction.channel_id
-    match = bot.active_matches.get(channel_id)
-    
-    if not match:
-        await interaction.response.send_message("No active match in this channel!", ephemeral=True)
-        return
-    
-    if match.state != GameState.PICKING_STANCES:
-        await interaction.response.send_message("Not currently in picking phase!", ephemeral=True)
-        return
-    
     user_id = interaction.user.id
-    if user_id not in [match.player1.user_id, match.player2.user_id]:
-        await interaction.response.send_message("You are not part of this match!", ephemeral=True)
-        return
     
-    player = match.player1 if user_id == match.player1.user_id else match.player2
-    
-    if choice not in player.declared_stances:
-        await interaction.response.send_message(f"{choice} is not one of your declared stances!", ephemeral=True)
-        return
-    
-    if player.picked_stance:
-        await interaction.response.send_message("You have already made your pick!", ephemeral=True)
-        return
-    
-    # Set the pick
-    player.picked_stance = choice
+    # Use lock to prevent race conditions
+    async with await bot._get_match_lock(channel_id):
+        match = bot.active_matches.get(channel_id)
+        
+        if not match:
+            await interaction.response.send_message("No active match in this channel!", ephemeral=True)
+            return
+        
+        if match.state != GameState.PICKING_STANCES:
+            await interaction.response.send_message("Not currently in picking phase!", ephemeral=True)
+            return
+        
+        if user_id not in [match.player1.user_id, match.player2.user_id]:
+            await interaction.response.send_message("You are not part of this match!", ephemeral=True)
+            return
+        
+        player = match.player1 if user_id == match.player1.user_id else match.player2
+        
+        if choice not in player.declared_stances:
+            await interaction.response.send_message(f"{choice} is not one of your declared stances!", ephemeral=True)
+            return
+        
+        if player.picked_stance:
+            await interaction.response.send_message("You have already made your pick!", ephemeral=True)
+            return
+        
+        # Set the pick
+        player.picked_stance = choice
+        
+        # Check if both players have picked
+        both_picked = match.player1.picked_stance and match.player2.picked_stance
+        if both_picked:
+            logger.info(f"Both players picked stances in channel {channel_id}, resolving round")
     
     await interaction.response.send_message(f"✅ You picked **{choice}**", ephemeral=True)
     
     # Announce publicly that player has locked in
     await interaction.followup.send(f"🔒 **{interaction.user.display_name}** has locked in their choice!")
     
-    # Check if both players have picked
-    if match.player1.picked_stance and match.player2.picked_stance:
+    # Resolve round if both players have picked
+    if both_picked:
         await resolve_round(interaction, match)
 
 async def resolve_round(interaction: discord.Interaction, match: Match):
@@ -685,8 +802,9 @@ async def announce_match_winner(interaction: discord.Interaction, match: Match):
     
     await interaction.followup.send(embed=embed)
     
-    # Clean up match
-    del bot.active_matches[match.channel_id]
+    # Clean up match using the proper cleanup method
+    logger.info(f"Match completed in channel {match.channel_id}: {winner.username} defeats {loser.username}")
+    bot._cleanup_match(match.channel_id)
 
 async def handle_status(interaction: discord.Interaction):
     """Handle status command"""
@@ -792,8 +910,9 @@ async def handle_end(interaction: discord.Interaction):
         await interaction.response.send_message("No active match in this channel!", ephemeral=True)
         return
     
-    # End the match
-    del bot.active_matches[channel_id]
+    # End the match using proper cleanup
+    logger.info(f"Match force-ended in channel {channel_id} by moderator {interaction.user.id}")
+    bot._cleanup_match(channel_id)
     
     embed = discord.Embed(
         title="🛑 Match Ended",
@@ -815,8 +934,9 @@ class CancelConfirmView(discord.ui.View):
             await interaction.followup.send("Only the person who initiated the cancel can confirm!", ephemeral=True)
             return
         
-        # Cancel the match
-        del bot.active_matches[self.match.channel_id]
+        # Cancel the match using proper cleanup
+        logger.info(f"Match cancelled in channel {self.match.channel_id} by user {interaction.user.id}")
+        bot._cleanup_match(self.match.channel_id)
         
         embed = discord.Embed(
             title="❌ Match Cancelled",
@@ -854,4 +974,19 @@ if __name__ == "__main__":
         print("Please create a .env file with your bot token.")
         exit(1)
     
-    bot.run(token)
+    try:
+        logger.info("Starting DuelBot...")
+        bot.run(token)
+    except discord.LoginFailure:
+        logger.error("Invalid bot token! Please check your DISCORD_TOKEN in .env file.")
+        exit(1)
+    except discord.HTTPException as e:
+        logger.error(f"HTTP error connecting to Discord: {e}")
+        exit(1)
+    except KeyboardInterrupt:
+        logger.info("Bot shutdown requested by user")
+    except Exception as e:
+        logger.error(f"Unexpected error starting bot: {e}")
+        exit(1)
+    finally:
+        logger.info("DuelBot shutdown complete")

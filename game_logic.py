@@ -68,10 +68,10 @@ class ImperialDuelGame:
             # stance1 has advantage over stance2
             return "advantage", "disadvantage"
         elif delta == 5:
-            # stance1 has disadvantage vs stance2
+            # stance1 has disadvantage vs stance2 (only delta 5, not 4)
             return "disadvantage", "advantage"
         else:
-            # neutral
+            # neutral (delta == 0, 3, or 4)
             return "neutral", "neutral"
     
     def are_stances_adjacent(self, stance1: str, stance2: str) -> bool:
