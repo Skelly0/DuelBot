@@ -13,9 +13,21 @@ from game_logic import ImperialDuelGame, Match, Player, GameState
 # Load environment variables
 load_dotenv()
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging with more detailed format
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 logger = logging.getLogger(__name__)
+
+# Set Discord library logging to WARNING to reduce noise, but keep our logs at INFO
+logging.getLogger('discord').setLevel(logging.WARNING)
+logging.getLogger('discord.http').setLevel(logging.WARNING)
+
+# Constants for autocomplete monitoring
+AUTOCOMPLETE_SLOW_THRESHOLD_MS = 1000  # Warn if autocomplete takes longer than 1 second
+AUTOCOMPLETE_TIMEOUT_THRESHOLD_MS = 2500  # Critical warning if approaching 3-second timeout
 
 class DuelBot(commands.Bot):
     def __init__(self):
@@ -34,17 +46,38 @@ class DuelBot(commands.Bot):
         
     async def setup_hook(self):
         """Called when the bot is starting up"""
+        logger.info("Bot setup_hook called - Bot is starting up")
         await self.tree.sync()
         print(f"Synced slash commands for {self.user}")
+        logger.info(f"Slash commands synced for {self.user}")
         
         # Start the cleanup task
         self.cleanup_matches.start()
         logger.info("Started match cleanup task")
     
     async def on_ready(self):
+        current_time = time.time()
         print(f'{self.user} has connected to Discord!')
         print(f'Bot is in {len(self.guilds)} guilds')
+        logger.info(f"Bot ready at {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(current_time))}")
         logger.info(f"Bot ready with {len(self.active_matches)} active matches")
+        logger.info(f"Bot user ID: {self.user.id}, Guilds: {[guild.name for guild in self.guilds]}")
+    
+    async def on_error(self, event, *args, **kwargs):
+        """Handle general bot errors"""
+        logger.error(f"Bot error in event '{event}': {args}, {kwargs}", exc_info=True)
+    
+    async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+        """Handle application command errors"""
+        if isinstance(error, discord.app_commands.CommandInvokeError):
+            original_error = error.original
+            if isinstance(original_error, discord.NotFound) and "Unknown interaction" in str(original_error):
+                logger.warning(f"Unknown interaction error for user {interaction.user.id} in channel {interaction.channel_id}: {original_error}")
+                logger.warning(f"Command: {interaction.command.name if interaction.command else 'Unknown'}, Data: {interaction.data}")
+            else:
+                logger.error(f"Command invoke error for {interaction.command.name if interaction.command else 'Unknown'}: {original_error}", exc_info=True)
+        else:
+            logger.error(f"App command error: {type(error).__name__}: {error}", exc_info=True)
     
     @tasks.loop(minutes=30)  # Run cleanup every 30 minutes
     async def cleanup_matches(self):
@@ -346,8 +379,31 @@ async def declare_command(
 @declare_command.autocomplete('first')
 @declare_command.autocomplete('second')
 async def declare_stance_autocomplete(interaction: discord.Interaction, current: str):
-    stances = bot.game.STANCES
-    return [app_commands.Choice(name=stance, value=stance) for stance in stances if current.lower() in stance.lower()]
+    start_time = time.time()
+    try:
+        logger.info(f"Autocomplete request for 'declare' - User: {interaction.user.id}, Current: '{current}', Channel: {interaction.channel_id}")
+        
+        stances = bot.game.STANCES
+        filtered_stances = [app_commands.Choice(name=stance, value=stance) for stance in stances if current.lower() in stance.lower()]
+        
+        processing_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+        
+        # Log performance warnings
+        if processing_time > AUTOCOMPLETE_TIMEOUT_THRESHOLD_MS:
+            logger.critical(f"CRITICAL: Declare autocomplete took {processing_time:.2f}ms - approaching timeout!")
+        elif processing_time > AUTOCOMPLETE_SLOW_THRESHOLD_MS:
+            logger.warning(f"SLOW: Declare autocomplete took {processing_time:.2f}ms")
+        else:
+            logger.info(f"Autocomplete response for 'declare' - Processed in {processing_time:.2f}ms, Returned {len(filtered_stances)} choices")
+        
+        return filtered_stances
+        
+    except Exception as e:
+        processing_time = (time.time() - start_time) * 1000
+        logger.error(f"Error in declare autocomplete after {processing_time:.2f}ms: {type(e).__name__}: {e}")
+        logger.error(f"Autocomplete context - User: {interaction.user.id}, Current: '{current}', Channel: {interaction.channel_id}")
+        # Return empty list on error to prevent further issues
+        return []
 
 # ============================================================================
 # PICK COMMAND
@@ -364,8 +420,31 @@ async def pick_command(
 
 @pick_command.autocomplete('choice')
 async def pick_stance_autocomplete(interaction: discord.Interaction, current: str):
-    stances = bot.game.STANCES
-    return [app_commands.Choice(name=stance, value=stance) for stance in stances if current.lower() in stance.lower()]
+    start_time = time.time()
+    try:
+        logger.info(f"Autocomplete request for 'pick' - User: {interaction.user.id}, Current: '{current}', Channel: {interaction.channel_id}")
+        
+        stances = bot.game.STANCES
+        filtered_stances = [app_commands.Choice(name=stance, value=stance) for stance in stances if current.lower() in stance.lower()]
+        
+        processing_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+        
+        # Log performance warnings
+        if processing_time > AUTOCOMPLETE_TIMEOUT_THRESHOLD_MS:
+            logger.critical(f"CRITICAL: Pick autocomplete took {processing_time:.2f}ms - approaching timeout!")
+        elif processing_time > AUTOCOMPLETE_SLOW_THRESHOLD_MS:
+            logger.warning(f"SLOW: Pick autocomplete took {processing_time:.2f}ms")
+        else:
+            logger.info(f"Autocomplete response for 'pick' - Processed in {processing_time:.2f}ms, Returned {len(filtered_stances)} choices")
+        
+        return filtered_stances
+        
+    except Exception as e:
+        processing_time = (time.time() - start_time) * 1000
+        logger.error(f"Error in pick autocomplete after {processing_time:.2f}ms: {type(e).__name__}: {e}")
+        logger.error(f"Autocomplete context - User: {interaction.user.id}, Current: '{current}', Channel: {interaction.channel_id}")
+        # Return empty list on error to prevent further issues
+        return []
 
 # ============================================================================
 # SWITCH COMMAND
@@ -387,8 +466,31 @@ async def switch_command(
 @switch_command.autocomplete('old')
 @switch_command.autocomplete('new')
 async def switch_stance_autocomplete(interaction: discord.Interaction, current: str):
-    stances = bot.game.STANCES
-    return [app_commands.Choice(name=stance, value=stance) for stance in stances if current.lower() in stance.lower()]
+    start_time = time.time()
+    try:
+        logger.info(f"Autocomplete request for 'switch' - User: {interaction.user.id}, Current: '{current}', Channel: {interaction.channel_id}")
+        
+        stances = bot.game.STANCES
+        filtered_stances = [app_commands.Choice(name=stance, value=stance) for stance in stances if current.lower() in stance.lower()]
+        
+        processing_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+        
+        # Log performance warnings
+        if processing_time > AUTOCOMPLETE_TIMEOUT_THRESHOLD_MS:
+            logger.critical(f"CRITICAL: Switch autocomplete took {processing_time:.2f}ms - approaching timeout!")
+        elif processing_time > AUTOCOMPLETE_SLOW_THRESHOLD_MS:
+            logger.warning(f"SLOW: Switch autocomplete took {processing_time:.2f}ms")
+        else:
+            logger.info(f"Autocomplete response for 'switch' - Processed in {processing_time:.2f}ms, Returned {len(filtered_stances)} choices")
+        
+        return filtered_stances
+        
+    except Exception as e:
+        processing_time = (time.time() - start_time) * 1000
+        logger.error(f"Error in switch autocomplete after {processing_time:.2f}ms: {type(e).__name__}: {e}")
+        logger.error(f"Autocomplete context - User: {interaction.user.id}, Current: '{current}', Channel: {interaction.channel_id}")
+        # Return empty list on error to prevent further issues
+        return []
 
 # ============================================================================
 # STATUS COMMAND
