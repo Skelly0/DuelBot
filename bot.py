@@ -1156,7 +1156,7 @@ async def handle_add_modifier(interaction: discord.Interaction, player: discord.
         embed.color = discord.Color.red()
     else:
         embed.description = f"**{player.display_name}**'s modifier has been removed."
-        embed.color = discord.Color.grey()
+        embed.color = discord.Color.light_gray()
     
     embed.set_footer(text=f"Applied by {interaction.user.display_name}")
     
