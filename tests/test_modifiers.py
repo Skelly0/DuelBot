@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """
-Test script for the new modifier functionality
+Test script for the modifier functionality (match-wide and round-specific)
 """
+
+import sys
+import os
+
+# Add the parent directory to the path so we can import game_logic
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from game_logic import ImperialDuelGame, Match, Player, GameState
 
-def test_custom_modifiers():
-    """Test that custom modifiers are applied correctly"""
-    print("Testing custom modifier functionality...")
+def test_modifiers():
+    """Test that both match and round modifiers are applied correctly"""
+    print("Testing modifier functionality (match and round)...")
     
     # Create a game instance
     game = ImperialDuelGame()
@@ -47,17 +53,64 @@ def test_custom_modifiers():
     player1.picked_stance = "Bagr"
     player2.picked_stance = "Darda"
     
-    # Test with modifiers
-    print("\n2. Testing with modifiers (+2 for player1, -1 for player2):")
+    # Test with match modifiers only
+    print("\n2. Testing with match modifiers (+2 for player1, -1 for player2):")
     match.custom_modifiers = {1: 2, 2: -1}  # player1 gets +2, player2 gets -1
+    match.round_modifiers = {}  # No round modifiers
     
     result2 = game.resolve_round(match)
     print(f"   Player1 roll: {result2.player1_roll} -> {result2.player1_final_roll} (modifier: {result2.player1_modifier:+d})")
     print(f"   Player2 roll: {result2.player2_roll} -> {result2.player2_final_roll} (modifier: {result2.player2_modifier:+d})")
     print(f"   Custom modifiers applied: {result2.custom_mod_applied}")
     
+    # Reset match for next test
+    match.current_round = 1
+    match.player1.score = 0
+    match.player2.score = 0
+    match.round_history = []
+    match.state = GameState.PICKING_STANCES
+    player1.picked_stance = "Bagr"
+    player2.picked_stance = "Darda"
+    
+    # Test with round modifiers only
+    print("\n3. Testing with round modifiers only (+1 for player1, -2 for player2):")
+    match.custom_modifiers = {}  # No match modifiers
+    match.round_modifiers = {1: 1, 2: -2}  # player1 gets +1, player2 gets -2 for this round only
+    
+    result3 = game.resolve_round(match)
+    print(f"   Player1 roll: {result3.player1_roll} -> {result3.player1_final_roll} (modifier: {result3.player1_modifier:+d})")
+    print(f"   Player2 roll: {result3.player2_roll} -> {result3.player2_final_roll} (modifier: {result3.player2_modifier:+d})")
+    print(f"   Custom modifiers applied: {result3.custom_mod_applied}")
+    
+    # Verify round modifiers are cleared after the round
+    print(f"   Round modifiers after round: {match.round_modifiers}")
+    assert len(match.round_modifiers) == 0, "Round modifiers were not cleared after the round"
+    
+    # Reset match for next test
+    match.current_round = 1
+    match.player1.score = 0
+    match.player2.score = 0
+    match.round_history = []
+    match.state = GameState.PICKING_STANCES
+    player1.picked_stance = "Bagr"
+    player2.picked_stance = "Darda"
+    
+    # Test with both match and round modifiers
+    print("\n4. Testing with both match and round modifiers:")
+    match.custom_modifiers = {1: 1, 2: -1}  # Match modifiers
+    match.round_modifiers = {1: 1, 2: -1}  # Round modifiers
+    
+    result4 = game.resolve_round(match)
+    print(f"   Player1 roll: {result4.player1_roll} -> {result4.player1_final_roll} (modifier: {result4.player1_modifier:+d})")
+    print(f"   Player2 roll: {result4.player2_roll} -> {result4.player2_final_roll} (modifier: {result4.player2_modifier:+d})")
+    print(f"   Custom modifiers applied: {result4.custom_mod_applied}")
+    
+    # Verify the modifiers were combined correctly
+    assert result4.player1_modifier == 2, f"Expected player1 modifier to be 2, got {result4.player1_modifier}"
+    assert result4.player2_modifier == -2, f"Expected player2 modifier to be -2, got {result4.player2_modifier}"
+    
     # Test edge cases
-    print("\n3. Testing edge cases (rolls clamped to 1-6):")
+    print("\n5. Testing edge cases (rolls clamped to 1-6):")
     # Force some specific rolls by testing multiple times
     for i in range(5):
         match.current_round = 1
@@ -76,7 +129,7 @@ def test_custom_modifiers():
         assert 1 <= result.player1_final_roll <= 6, f"Player1 final roll {result.player1_final_roll} out of bounds"
         assert 1 <= result.player2_final_roll <= 6, f"Player2 final roll {result.player2_final_roll} out of bounds"
     
-    print("\n✅ All tests passed! Custom modifier functionality is working correctly.")
+    print("\n✅ All tests passed! Modifier functionality (match and round) is working correctly.")
 
 if __name__ == "__main__":
-    test_custom_modifiers()
+    test_modifiers()

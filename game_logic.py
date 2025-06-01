@@ -52,7 +52,8 @@ class Match:
     bait_switch: bool = False
     round_history: List[RoundResult] = field(default_factory=list)
     last_stances: Dict[int, str] = field(default_factory=dict)  # user_id -> last stance used
-    custom_modifiers: Dict[int, int] = field(default_factory=dict)  # user_id -> modifier value
+    custom_modifiers: Dict[int, int] = field(default_factory=dict)  # user_id -> modifier value (match-wide)
+    round_modifiers: Dict[int, int] = field(default_factory=dict)  # user_id -> modifier value (current round only)
 
 class ImperialDuelGame:
     STANCES = ["Bagr", "Radae", "Darda", "Tigr", "Riposje", "Tortad"]
@@ -146,9 +147,17 @@ class ImperialDuelGame:
             p1_final = p1_roll
             p2_final = p2_roll
         
-        # Apply custom modifiers if any
-        p1_modifier = match.custom_modifiers.get(match.player1.user_id, 0)
-        p2_modifier = match.custom_modifiers.get(match.player2.user_id, 0)
+        # Apply custom modifiers (match-wide and round-specific)
+        p1_match_modifier = match.custom_modifiers.get(match.player1.user_id, 0)
+        p2_match_modifier = match.custom_modifiers.get(match.player2.user_id, 0)
+        
+        p1_round_modifier = match.round_modifiers.get(match.player1.user_id, 0)
+        p2_round_modifier = match.round_modifiers.get(match.player2.user_id, 0)
+        
+        # Calculate total modifiers
+        p1_modifier = p1_match_modifier + p1_round_modifier
+        p2_modifier = p2_match_modifier + p2_round_modifier
+        
         custom_mod_applied = p1_modifier != 0 or p2_modifier != 0
         
         if p1_modifier != 0:
@@ -209,6 +218,9 @@ class ImperialDuelGame:
             match.player2.declared_stances = []
             match.player2.picked_stance = None
             match.player2.has_switched = False
+            
+            # Clear round-specific modifiers
+            match.round_modifiers.clear()
         
         return result
     
