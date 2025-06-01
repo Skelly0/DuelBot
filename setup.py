@@ -98,7 +98,7 @@ def test_game_logic():
     """Run game logic tests"""
     print("\n🧪 Testing game logic...")
     try:
-        import test_game
+        import tests.test_game as test_game
         test_game.main()
         return True
     except Exception as e:

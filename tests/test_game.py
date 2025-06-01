@@ -69,7 +69,7 @@ def test_dice_rolling():
     for advantage_state in ["advantage", "neutral", "disadvantage"]:
         rolls = []
         for _ in range(10):
-            final_roll, all_rolls = game.roll_dice(advantage_state)
+            final_roll, all_rolls, used_index = game.roll_dice(advantage_state)
             rolls.append(final_roll)
         
         avg_roll = sum(rolls) / len(rolls)

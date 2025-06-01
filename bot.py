@@ -866,14 +866,56 @@ async def resolve_round(interaction: discord.Interaction, match: Match):
     adv_text = f"**{match.player1.username}**: {result.player1_advantage.title()}\n**{match.player2.username}**: {result.player2_advantage.title()}"
     embed.add_field(name="Advantage", value=adv_text, inline=True)
     
-    # Dice rolls
-    roll_text = f"**{match.player1.username}**: {result.player1_roll}"
-    if result.player1_final_roll != result.player1_roll:
-        roll_text += f" → {result.player1_final_roll}"
-    roll_text += f"\n**{match.player2.username}**: {result.player2_roll}"
-    if result.player2_final_roll != result.player2_roll:
-        roll_text += f" → {result.player2_final_roll}"
-    embed.add_field(name="Dice Rolls", value=roll_text, inline=True)
+    # Dice rolls with detailed breakdown
+    def format_roll_details(username: str, advantage: str, all_rolls: list, used_index: int, base_roll: int, final_roll: int, modifier: int) -> str:
+        if advantage == "neutral":
+            # Single roll case
+            equation = f"[{base_roll}]"
+            if modifier != 0:
+                equation += f" {modifier:+d} = {final_roll}"
+            else:
+                equation += f" = {final_roll}"
+            return f"**{username}**: {equation}"
+        else:
+            # Advantage/disadvantage case with 2d6
+            roll_display = []
+            for i, roll in enumerate(all_rolls):
+                if i == used_index:
+                    roll_display.append(f"**{roll}**")  # Bold the used roll
+                else:
+                    roll_display.append(str(roll))
+            
+            rolls_text = f"2d6: [{', '.join(roll_display)}]"
+            equation = f"[{base_roll}]"
+            if modifier != 0:
+                equation += f" {modifier:+d} = {final_roll}"
+            else:
+                equation += f" = {final_roll}"
+            
+            return f"**{username}**: {rolls_text} → {equation}"
+    
+    p1_roll_text = format_roll_details(
+        match.player1.username,
+        result.player1_advantage,
+        result.player1_all_rolls,
+        result.player1_used_roll_index,
+        result.player1_roll,
+        result.player1_final_roll,
+        result.player1_modifier
+    )
+    
+    p2_roll_text = format_roll_details(
+        match.player2.username,
+        result.player2_advantage,
+        result.player2_all_rolls,
+        result.player2_used_roll_index,
+        result.player2_roll,
+        result.player2_final_roll,
+        result.player2_modifier
+    )
+    
+    roll_text = f"{p1_roll_text}\n{p2_roll_text}"
+    embed.add_field(name="Dice Rolls", value=roll_text, inline=False)
     
     # Winner
     winner_name = match.player1.username if result.winner_id == match.player1.user_id else match.player2.username

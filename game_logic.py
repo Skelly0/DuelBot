@@ -34,6 +34,10 @@ class RoundResult:
     custom_mod_applied: bool = False
     player1_modifier: int = 0
     player2_modifier: int = 0
+    player1_all_rolls: List[int] = field(default_factory=list)
+    player2_all_rolls: List[int] = field(default_factory=list)
+    player1_used_roll_index: int = -1
+    player2_used_roll_index: int = -1
 
 @dataclass
 class Match:
@@ -92,20 +96,25 @@ class ImperialDuelGame:
         delta = abs(idx1 - idx2)
         return delta == 3
     
-    def roll_dice(self, advantage_state: str) -> Tuple[int, List[int]]:
+    def roll_dice(self, advantage_state: str) -> Tuple[int, List[int], int]:
         """
         Roll dice based on advantage state
-        Returns: (final_roll, all_rolls)
+        Returns: (final_roll, all_rolls, used_roll_index)
+        used_roll_index: -1 for single roll, 0/1 for which roll was used in advantage/disadvantage
         """
         if advantage_state == "advantage":
             rolls = [random.randint(1, 6), random.randint(1, 6)]
-            return max(rolls), rolls
+            max_roll = max(rolls)
+            used_index = rolls.index(max_roll)
+            return max_roll, rolls, used_index
         elif advantage_state == "disadvantage":
             rolls = [random.randint(1, 6), random.randint(1, 6)]
-            return min(rolls), rolls
+            min_roll = min(rolls)
+            used_index = rolls.index(min_roll)
+            return min_roll, rolls, used_index
         else:  # neutral
             roll = random.randint(1, 6)
-            return roll, [roll]
+            return roll, [roll], -1
     
     def apply_adjacency_mod(self, roll: int, stance1: str, stance2: str) -> int:
         """Apply adjacency modifier to roll"""
@@ -124,8 +133,8 @@ class ImperialDuelGame:
         p1_adv, p2_adv = self.get_stance_relationship(p1_stance, p2_stance)
         
         # Roll dice
-        p1_roll, p1_all_rolls = self.roll_dice(p1_adv)
-        p2_roll, p2_all_rolls = self.roll_dice(p2_adv)
+        p1_roll, p1_all_rolls, p1_used_index = self.roll_dice(p1_adv)
+        p2_roll, p2_all_rolls, p2_used_index = self.roll_dice(p2_adv)
         
         # Apply adjacency modifier if enabled
         adjacency_applied = False
@@ -177,7 +186,11 @@ class ImperialDuelGame:
             player2_final_roll=p2_final,
             custom_mod_applied=custom_mod_applied,
             player1_modifier=p1_modifier,
-            player2_modifier=p2_modifier
+            player2_modifier=p2_modifier,
+            player1_all_rolls=p1_all_rolls,
+            player2_all_rolls=p2_all_rolls,
+            player1_used_roll_index=p1_used_index,
+            player2_used_roll_index=p2_used_index
         )
         
         match.round_history.append(result)
