@@ -1,4 +1,4 @@
-# Imperial Duel Discord Bot
+# Duel Discord Bot
 
 A Discord bot that runs the six-stance dueling mini-game via slash commands, handling match flow, hidden picks, dice rolls with advantage/disadvantage, and scoring.
 
