@@ -873,11 +873,14 @@ async def handle_stance_pick(interaction: discord.Interaction, choice: str):
 
 async def resolve_round(interaction: discord.Interaction, match: Match):
     """Resolve the current round"""
+    # Capture the round number before resolving, as the game logic may or may
+    # not increment the round depending on match completion.
+    resolved_round = match.current_round
     result = bot.game.resolve_round(match)
-    
-    # Create result embed
+
+    # Create result embed using the round number captured above
     embed = discord.Embed(
-        title=f"⚔️ Round {match.current_round - 1} Results",
+        title=f"⚔️ Round {resolved_round} Results",
         color=discord.Color.gold()
     )
     
