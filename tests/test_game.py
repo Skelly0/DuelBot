@@ -21,7 +21,7 @@ def test_stance_relationships():
         ("Bagr", "Radae", "advantage", "disadvantage"),  # Bagr has advantage over Radae
         ("Bagr", "Darda", "advantage", "disadvantage"),  # Bagr has advantage over Darda
         ("Bagr", "Tigr", "neutral", "neutral"),          # Bagr is neutral to Tigr
-        ("Bagr", "Riposje", "neutral", "neutral"),       # Bagr is neutral to Riposje
+        ("Bagr", "Riposje", "neutral", "advantage"),     # Riposje should have advantage over Bagr
         ("Bagr", "Tortad", "disadvantage", "advantage"), # Bagr has disadvantage vs Tortad
         ("Riposje", "Bagr", "advantage", "disadvantage"), # Riposje should beat Bagr
     ]
