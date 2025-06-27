@@ -70,6 +70,9 @@ Cancel the current match (requires confirmation).
 ### `/duel end`
 Force-end a match (moderators only).
 
+### `/duel chaurus_talent_toggle`
+Toggle a persistent +1 roll bonus for players with "Chaurus" in their nickname (moderators only).
+
 ## Game Rules
 
 ### Stance Relationships

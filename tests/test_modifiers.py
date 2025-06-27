@@ -128,8 +128,53 @@ def test_modifiers():
         # Verify rolls are within bounds
         assert 1 <= result.player1_final_roll <= 6, f"Player1 final roll {result.player1_final_roll} out of bounds"
         assert 1 <= result.player2_final_roll <= 6, f"Player2 final roll {result.player2_final_roll} out of bounds"
-    
+
     print("\n✅ All tests passed! Modifier functionality (match and round) is working correctly.")
+
+def test_chaurus_talent():
+    """Test the Chaurus talent toggle"""
+    print("\n6. Testing Chaurus talent toggle:")
+    game = ImperialDuelGame()
+
+    # Player1 has 'Chaurus' in the name
+    player1 = Player(user_id=1, username="Hero Chaurus")
+    player2 = Player(user_id=2, username="Opponent")
+
+    match = Match(
+        channel_id=999,
+        player1=player1,
+        player2=player2,
+        best_of=3,
+        state=GameState.PICKING_STANCES,
+        chaurus_talent=True
+    )
+
+    player1.declared_stances = ["Bagr", "Radae"]
+    player1.picked_stance = "Bagr"
+    player2.declared_stances = ["Darda", "Tigr"]
+    player2.picked_stance = "Darda"
+
+    result = game.resolve_round(match)
+    print(f"   Player1 modifier applied: {result.player1_modifier}")
+    assert result.player1_modifier >= 1, "Chaurus talent bonus was not applied"
+
+def test_settings_persistence():
+    """Test persistence of the Chaurus talent setting"""
+    from settings import load_settings, save_settings
+
+    print("\n7. Testing settings persistence:")
+    settings = load_settings()
+    original = settings.get('chaurus_talent', False)
+    settings['chaurus_talent'] = not original
+    save_settings(settings)
+    reloaded = load_settings()
+    print(f"   Setting after save: {reloaded['chaurus_talent']}")
+    assert reloaded['chaurus_talent'] == (not original), "Setting did not persist"
+    # Restore
+    settings['chaurus_talent'] = original
+    save_settings(settings)
 
 if __name__ == "__main__":
     test_modifiers()
+    test_chaurus_talent()
+    test_settings_persistence()
