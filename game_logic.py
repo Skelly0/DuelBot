@@ -78,15 +78,18 @@ class ImperialDuelGame:
         
         # Calculate delta: (idx2 - idx1) mod 6
         delta = (idx2 - idx1) % 6
-        
+
         if delta in [1, 2]:
             # stance1 has advantage over stance2
             return "advantage", "disadvantage"
         elif delta == 5:
-            # stance1 has disadvantage vs stance2 (only delta 5, not 4)
+            # stance1 has disadvantage vs stance2 (counter-clockwise adjacent)
             return "disadvantage", "advantage"
+        elif delta == 4:
+            # stance2 has advantage over stance1 while stance1 remains neutral
+            return "neutral", "advantage"
         else:
-            # neutral (delta == 0, 3, or 4)
+            # neutral (delta == 0 or 3)
             return "neutral", "neutral"
     
     def are_stances_adjacent(self, stance1: str, stance2: str) -> bool:
