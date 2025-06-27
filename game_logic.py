@@ -50,6 +50,7 @@ class Match:
     no_repeat: bool = False
     adjacency_mod: bool = False
     bait_switch: bool = False
+    chaurus_talent: bool = False
     round_history: List[RoundResult] = field(default_factory=list)
     last_stances: Dict[int, str] = field(default_factory=dict)  # user_id -> last stance used
     custom_modifiers: Dict[int, int] = field(default_factory=dict)  # user_id -> modifier value (match-wide)
@@ -166,6 +167,13 @@ class ImperialDuelGame:
         # Calculate total modifiers
         p1_modifier = p1_match_modifier + p1_round_modifier
         p2_modifier = p2_match_modifier + p2_round_modifier
+
+        # Apply Chaurus talent bonus if enabled
+        if match.chaurus_talent:
+            if "chaurus" in match.player1.username.lower():
+                p1_modifier += 1
+            if "chaurus" in match.player2.username.lower():
+                p2_modifier += 1
         
         custom_mod_applied = p1_modifier != 0 or p2_modifier != 0
         

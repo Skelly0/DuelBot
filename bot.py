@@ -9,6 +9,7 @@ import time
 import logging
 
 from game_logic import ImperialDuelGame, Match, Player, GameState
+from settings import load_settings, save_settings
 
 # Load environment variables
 load_dotenv()
@@ -39,6 +40,10 @@ class DuelBot(commands.Bot):
         self.active_matches: Dict[int, Match] = {}  # channel_id -> Match
         self.match_locks: Dict[int, asyncio.Lock] = {}  # channel_id -> Lock for concurrency protection
         self.match_timestamps: Dict[int, float] = {}  # channel_id -> creation timestamp
+
+        # Load persistent settings
+        self.settings = load_settings()
+        self.chaurus_talent = self.settings.get('chaurus_talent', False)
         
         # Match cleanup configuration
         self.MATCH_TIMEOUT_HOURS = 24  # Cleanup matches older than 24 hours
@@ -184,7 +189,8 @@ async def help_command(interaction: discord.Interaction):
             "`/end` - Force-end a match (requires manage messages permission)\n"
             "`/add_round_modifier @player modifier` - Add dice roll modifier for the current round (-3 to +3)\n"
             "`/add_match_modifier @player modifier` - Add dice roll modifier for the entire match (-3 to +3)\n"
-            "`/view_modifiers` - View active dice roll modifiers"
+            "`/view_modifiers` - View active dice roll modifiers\n"
+            "`/chaurus_talent_toggle` - Toggle +1 bonus for 'Chaurus' nicknames (persistent)"
         ),
         inline=False
     )
@@ -559,6 +565,11 @@ async def view_modifiers_command(interaction: discord.Interaction):
     """View active dice roll modifiers (moderators only)"""
     await handle_view_modifiers(interaction)
 
+@bot.tree.command(name="chaurus_talent_toggle", description="Toggle Chaurus talent bonus (moderators only)")
+async def chaurus_talent_toggle_command(interaction: discord.Interaction):
+    """Toggle the Chaurus talent bonus (mods only)"""
+    await handle_chaurus_talent_toggle(interaction)
+
 # ============================================================================
 # COMMAND HANDLERS (unchanged from original)
 # ============================================================================
@@ -600,7 +611,8 @@ async def handle_challenge(interaction: discord.Interaction, opponent: discord.M
             best_of=best_of,
             no_repeat=no_repeat,
             adjacency_mod=adjacency_mod,
-            bait_switch=bait_switch
+            bait_switch=bait_switch,
+            chaurus_talent=bot.chaurus_talent
         )
         
         # Store match and timestamp
@@ -1318,6 +1330,10 @@ async def handle_view_modifiers(interaction: discord.Interaction):
             value="\n".join(round_modifier_list),
             inline=False
         )
+
+    # Show Chaurus talent status
+    status = "Enabled" if getattr(match, 'chaurus_talent', False) else "Disabled"
+    embed.add_field(name="Chaurus Talent", value=status, inline=False)
     
     if not has_match_modifiers and not has_round_modifiers:
         embed.description = "No active modifiers are currently applied."
@@ -1326,6 +1342,31 @@ async def handle_view_modifiers(interaction: discord.Interaction):
     embed.set_footer(text=f"Requested by {interaction.user.display_name}")
     
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
+async def handle_chaurus_talent_toggle(interaction: discord.Interaction):
+    """Handle Chaurus talent toggle (mods only)"""
+    if not interaction.user.guild_permissions.manage_messages:
+        await interaction.response.send_message("Only moderators can toggle Chaurus talent!", ephemeral=True)
+        return
+
+    # Toggle global state and update all active matches
+    bot.chaurus_talent = not bot.chaurus_talent
+    bot.settings['chaurus_talent'] = bot.chaurus_talent
+    save_settings(bot.settings)
+
+    for m in bot.active_matches.values():
+        m.chaurus_talent = bot.chaurus_talent
+
+    status = "enabled" if bot.chaurus_talent else "disabled"
+
+    embed = discord.Embed(
+        title="✨ Chaurus Talent Toggled",
+        description=f"Chaurus talent is now **{status}**.",
+        color=discord.Color.green() if bot.chaurus_talent else discord.Color.red()
+    )
+    embed.set_footer(text=f"Toggled by {interaction.user.display_name}")
+
+    await interaction.response.send_message(embed=embed)
 
 class CancelConfirmView(discord.ui.View):
     def __init__(self, match: Match, user_id: int):
