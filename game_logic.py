@@ -57,16 +57,21 @@ class Match:
 
 class ImperialDuelGame:
     STANCES = ["Bagr", "Radae", "Darda", "Tigr", "Riposje", "Tortad"]
-    
+
     def __init__(self):
         # Pre-compute stance relationships
-        self.stance_to_index = {stance: i for i, stance in enumerate(self.STANCES)}
+        # Use lowercase keys for lookups so stance names are case-insensitive
+        self.stance_to_index = {stance.lower(): i for i, stance in enumerate(self.STANCES)}
         
     def get_stance_relationship(self, stance1: str, stance2: str) -> Tuple[str, str]:
         """
         Returns advantage state for (stance1, stance2)
         Returns: (stance1_advantage, stance2_advantage)
         """
+        # Normalize input for case/whitespace inconsistencies
+        stance1 = stance1.strip().lower()
+        stance2 = stance2.strip().lower()
+
         idx1 = self.stance_to_index[stance1]
         idx2 = self.stance_to_index[stance2]
         
@@ -85,6 +90,8 @@ class ImperialDuelGame:
     
     def are_stances_adjacent(self, stance1: str, stance2: str) -> bool:
         """Check if two stances are adjacent on the hexagon"""
+        stance1 = stance1.strip().lower()
+        stance2 = stance2.strip().lower()
         idx1 = self.stance_to_index[stance1]
         idx2 = self.stance_to_index[stance2]
         delta = abs(idx1 - idx2)
@@ -92,6 +99,8 @@ class ImperialDuelGame:
     
     def are_stances_opposite(self, stance1: str, stance2: str) -> bool:
         """Check if two stances are opposite on the hexagon"""
+        stance1 = stance1.strip().lower()
+        stance2 = stance2.strip().lower()
         idx1 = self.stance_to_index[stance1]
         idx2 = self.stance_to_index[stance2]
         delta = abs(idx1 - idx2)
@@ -233,5 +242,5 @@ class ImperialDuelGame:
         return last_stance != stance
     
     def validate_stance(self, stance: str) -> bool:
-        """Validate if a stance name is valid"""
-        return stance in self.STANCES
+        """Validate if a stance name is valid (case-insensitive)"""
+        return stance.strip().lower() in self.stance_to_index

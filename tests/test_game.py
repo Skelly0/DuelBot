@@ -20,6 +20,7 @@ def test_stance_relationships():
         ("Bagr", "Tigr", "neutral", "neutral"),          # Bagr is neutral to Tigr
         ("Bagr", "Riposje", "neutral", "neutral"),       # Bagr is neutral to Riposje
         ("Bagr", "Tortad", "disadvantage", "advantage"), # Bagr has disadvantage vs Tortad
+        ("Riposje", "Bagr", "advantage", "disadvantage"), # Riposje should beat Bagr
     ]
     
     for stance1, stance2, expected1, expected2 in test_cases:
