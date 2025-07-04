@@ -942,9 +942,40 @@ async def resolve_round(interaction: discord.Interaction, match: Match):
         result.player2_final_roll,
         result.player2_modifier
     )
-    
+
     roll_text = f"{p1_roll_text}\n{p2_roll_text}"
-    embed.add_field(name="Dice Rolls", value=roll_text, inline=False)
+
+    if result.tie_rerolled:
+        init_p1_text = format_roll_details(
+            match.player1.username,
+            result.player1_advantage,
+            result.initial_player1_all_rolls,
+            result.initial_player1_used_roll_index,
+            result.initial_player1_roll,
+            result.initial_player1_final_roll,
+            result.player1_modifier,
+        )
+
+        init_p2_text = format_roll_details(
+            match.player2.username,
+            result.player2_advantage,
+            result.initial_player2_all_rolls,
+            result.initial_player2_used_roll_index,
+            result.initial_player2_roll,
+            result.initial_player2_final_roll,
+            result.player2_modifier,
+        )
+
+        init_roll_text = f"{init_p1_text}\n{init_p2_text}"
+        embed.add_field(name="First Roll", value=init_roll_text, inline=False)
+        embed.add_field(name="Reroll", value=roll_text, inline=False)
+        embed.add_field(
+            name="Tie Break",
+            value="Initial roll was a tie. Rerolled to determine winner.",
+            inline=False,
+        )
+    else:
+        embed.add_field(name="Dice Rolls", value=roll_text, inline=False)
     
     # Winner
     winner_name = match.player1.username if result.winner_id == match.player1.user_id else match.player2.username

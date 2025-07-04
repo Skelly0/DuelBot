@@ -153,6 +153,43 @@ def test_no_repeat():
     
     print()
 
+def test_tie_reroll():
+    """Test that ties trigger a reroll"""
+    class FixedRollGame(ImperialDuelGame):
+        def __init__(self):
+            super().__init__()
+            self.roll_sequence = [3, 3, 5, 2]  # first two rolls tie, next decide winner
+            self.index = 0
+
+        def roll_dice(self, advantage_state):
+            roll = self.roll_sequence[self.index]
+            self.index += 1
+            return roll, [roll], -1
+
+    game = FixedRollGame()
+
+    player1 = Player(user_id=1, username="Alice")
+    player2 = Player(user_id=2, username="Bob")
+
+    match = Match(
+        channel_id=1,
+        player1=player1,
+        player2=player2,
+        best_of=3,
+        state=GameState.PICKING_STANCES
+    )
+
+    player1.declared_stances = ["Bagr", "Radae"]
+    player1.picked_stance = "Bagr"
+    player2.declared_stances = ["Bagr", "Radae"]
+    player2.picked_stance = "Bagr"  # Neutral matchup to keep rolls simple
+
+    result = game.resolve_round(match)
+    print(f"Tie rerolled: {result.tie_rerolled}")
+    assert result.tie_rerolled, "Reroll flag not set on tie"
+    assert result.initial_player1_roll == 3 and result.initial_player2_roll == 3, "Initial rolls not recorded"
+    assert result.player1_roll == 5 and result.player2_roll == 2, "Final reroll results incorrect"
+
 def main():
     """Run all tests"""
     print("🎯 Imperial Duel Game Logic Tests")
@@ -166,6 +203,7 @@ def main():
     test_dice_rolling()
     test_full_round()
     test_no_repeat()
+    test_tie_reroll()
     
     print("✅ All tests completed!")
     print("\nIf you see any ❌ marks above, there may be issues with the game logic.")

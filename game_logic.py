@@ -38,6 +38,15 @@ class RoundResult:
     player2_all_rolls: List[int] = field(default_factory=list)
     player1_used_roll_index: int = -1
     player2_used_roll_index: int = -1
+    tie_rerolled: bool = False
+    initial_player1_roll: int = 0
+    initial_player2_roll: int = 0
+    initial_player1_final_roll: int = 0
+    initial_player2_final_roll: int = 0
+    initial_player1_all_rolls: List[int] = field(default_factory=list)
+    initial_player2_all_rolls: List[int] = field(default_factory=list)
+    initial_player1_used_roll_index: int = -1
+    initial_player2_used_roll_index: int = -1
 
 @dataclass
 class Match:
@@ -146,56 +155,73 @@ class ImperialDuelGame:
         # Get advantage states
         p1_adv, p2_adv = self.get_stance_relationship(p1_stance, p2_stance)
         
-        # Roll dice
-        p1_roll, p1_all_rolls, p1_used_index = self.roll_dice(p1_adv)
-        p2_roll, p2_all_rolls, p2_used_index = self.roll_dice(p2_adv)
-        
-        # Apply adjacency modifier if enabled
-        adjacency_applied = False
-        if match.adjacency_mod:
-            p1_final = self.apply_adjacency_mod(p1_roll, p1_stance, p2_stance)
-            p2_final = self.apply_adjacency_mod(p2_roll, p2_stance, p1_stance)
-            adjacency_applied = (p1_final != p1_roll) or (p2_final != p2_roll)
-        else:
-            p1_final = p1_roll
-            p2_final = p2_roll
-        
-        # Apply custom modifiers (match-wide and round-specific)
+        # Pre-compute modifiers that persist across rerolls
         p1_match_modifier = match.custom_modifiers.get(match.player1.user_id, 0)
         p2_match_modifier = match.custom_modifiers.get(match.player2.user_id, 0)
-        
+
         p1_round_modifier = match.round_modifiers.get(match.player1.user_id, 0)
         p2_round_modifier = match.round_modifiers.get(match.player2.user_id, 0)
-        
-        # Calculate total modifiers
+
         p1_modifier = p1_match_modifier + p1_round_modifier
         p2_modifier = p2_match_modifier + p2_round_modifier
 
-        # Apply Chaurus talent bonus if enabled
         if match.chaurus_talent:
             if "chaurus" in match.player1.username.lower():
                 p1_modifier += 1
             if "chaurus" in match.player2.username.lower():
                 p2_modifier += 1
-        
+
         custom_mod_applied = p1_modifier != 0 or p2_modifier != 0
+
+        # Roll dice with rerolls until a winner is determined
+        tie_rerolled = False
+        first_p1_roll = first_p2_roll = None
+        first_p1_all = first_p2_all = None
+        first_p1_index = first_p2_index = -1
+        first_p1_final = first_p2_final = 0
+        first_iteration = True
+        while True:
+            p1_roll, p1_all_rolls, p1_used_index = self.roll_dice(p1_adv)
+            p2_roll, p2_all_rolls, p2_used_index = self.roll_dice(p2_adv)
+
+            adjacency_applied = False
+            if match.adjacency_mod:
+                p1_final = self.apply_adjacency_mod(p1_roll, p1_stance, p2_stance)
+                p2_final = self.apply_adjacency_mod(p2_roll, p2_stance, p1_stance)
+                adjacency_applied = (p1_final != p1_roll) or (p2_final != p2_roll)
+            else:
+                p1_final = p1_roll
+                p2_final = p2_roll
+
+            if p1_modifier != 0:
+                p1_final = max(1, min(6, p1_final + p1_modifier))
+            if p2_modifier != 0:
+                p2_final = max(1, min(6, p2_final + p2_modifier))
+
+            if first_iteration:
+                first_p1_roll = p1_roll
+                first_p2_roll = p2_roll
+                first_p1_all = p1_all_rolls
+                first_p2_all = p2_all_rolls
+                first_p1_index = p1_used_index
+                first_p2_index = p2_used_index
+                first_p1_final = p1_final
+                first_p2_final = p2_final
+                first_iteration = False
+
+            if p1_final != p2_final:
+                break
+
+            tie_rerolled = True
         
-        if p1_modifier != 0:
-            p1_final = max(1, min(6, p1_final + p1_modifier))
-        if p2_modifier != 0:
-            p2_final = max(1, min(6, p2_final + p2_modifier))
         
-        # Determine winner
+        # Determine winner (loop guarantees no tie)
         if p1_final > p2_final:
             winner_id = match.player1.user_id
             match.player1.score += 1
-        elif p2_final > p1_final:
+        else:
             winner_id = match.player2.user_id
             match.player2.score += 1
-        else:
-            # Tie - could implement tiebreaker rules here
-            winner_id = match.player1.user_id  # Default to player1 for now
-            match.player1.score += 1
         
         # Update last stances for no_repeat rule
         if match.no_repeat:
@@ -219,7 +245,16 @@ class ImperialDuelGame:
             player1_all_rolls=p1_all_rolls,
             player2_all_rolls=p2_all_rolls,
             player1_used_roll_index=p1_used_index,
-            player2_used_roll_index=p2_used_index
+            player2_used_roll_index=p2_used_index,
+            tie_rerolled=tie_rerolled,
+            initial_player1_roll=first_p1_roll if tie_rerolled else p1_roll,
+            initial_player2_roll=first_p2_roll if tie_rerolled else p2_roll,
+            initial_player1_final_roll=first_p1_final if tie_rerolled else p1_final,
+            initial_player2_final_roll=first_p2_final if tie_rerolled else p2_final,
+            initial_player1_all_rolls=first_p1_all if tie_rerolled else p1_all_rolls,
+            initial_player2_all_rolls=first_p2_all if tie_rerolled else p2_all_rolls,
+            initial_player1_used_roll_index=first_p1_index if tie_rerolled else p1_used_index,
+            initial_player2_used_roll_index=first_p2_index if tie_rerolled else p2_used_index
         )
         
         match.round_history.append(result)
