@@ -194,9 +194,9 @@ class ImperialDuelGame:
                 p2_final = p2_roll
 
             if p1_modifier != 0:
-                p1_final = max(1, min(6, p1_final + p1_modifier))
+                p1_final = p1_final + p1_modifier
             if p2_modifier != 0:
-                p2_final = max(1, min(6, p2_final + p2_modifier))
+                p2_final = p2_final + p2_modifier
 
             if first_iteration:
                 first_p1_roll = p1_roll
