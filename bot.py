@@ -90,7 +90,10 @@ class DuelBot(commands.Bot):
         current_time = time.time()
         channels_to_remove = []
         
-        for channel_id, match in self.active_matches.items():
+        # Iterate over a snapshot of the active matches to avoid
+        # "dictionary changed size" runtime errors if matches are
+        # created or cleaned up while this loop runs.
+        for channel_id, match in list(self.active_matches.items()):
             match_age_hours = (current_time - self.match_timestamps.get(channel_id, current_time)) / 3600
             
             # Check if match is too old
@@ -1388,7 +1391,9 @@ async def handle_chaurus_talent_toggle(interaction: discord.Interaction):
     bot.settings['chaurus_talent'] = bot.chaurus_talent
     save_settings(bot.settings)
 
-    for m in bot.active_matches.values():
+    # Update all currently active matches. Iterating over a list copy
+    # prevents runtime errors if a match ends during this loop.
+    for m in list(bot.active_matches.values()):
         m.chaurus_talent = bot.chaurus_talent
 
     status = "enabled" if bot.chaurus_talent else "disabled"
