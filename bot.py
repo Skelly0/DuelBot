@@ -261,7 +261,7 @@ async def rules_command(interaction: discord.Interaction):
             "**Advantage**: Roll 2d6, keep higher\n"
             "**Neutral**: Roll 1d6\n"
             "**Disadvantage**: Roll 2d6, keep lower\n"
-            "\n*Ties go to the challenger*"
+            "\n*If rolls tie, reroll until a winner is determined*"
         ),
         inline=True
     )

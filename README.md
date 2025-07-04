@@ -95,7 +95,7 @@ Each stance has:
 5. Apply adjacency modifier if enabled:
    - **Adjacent stances**: +1 to roll
    - **Opposite stances**: -1 to roll
-6. Higher roll wins the round
+6. Higher roll wins the round. If both rolls are tied, reroll until a winner is determined.
 7. First to required wins takes the match
 
 ### Optional Variants

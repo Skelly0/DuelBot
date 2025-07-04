@@ -130,6 +130,7 @@ Your friend can then accept with:
 - Advantage = roll 2d6, take higher
 - Disadvantage = roll 2d6, take lower  
 - Neutral = roll 1d6
+- Ties: reroll until there is a winner
 
 **Variants**:
 - **No Repeat**: Can't use same stance twice in a row
