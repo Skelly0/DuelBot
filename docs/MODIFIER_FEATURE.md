@@ -37,7 +37,7 @@ This feature allows for dynamic gameplay adjustments and special event scenarios
 
 1. **Application**: Modifiers are applied to the final dice roll after all other calculations (advantage/disadvantage, adjacency modifiers)
 2. **Stacking**: Round and match modifiers stack with each other (e.g., a +1 round modifier and a +1 match modifier result in a +2 total modifier)
-3. **Range**: Modifiers are clamped to ensure final rolls stay within 1-6 bounds
+3. **Range**: Modifiers are applied directly, so final rolls may exceed the normal 1-6 dice values
 4. **Persistence**:
    - Round modifiers are automatically cleared after each round
    - Match modifiers remain active for the entire match until changed or removed
@@ -60,7 +60,7 @@ This feature allows for dynamic gameplay adjustments and special event scenarios
 - Match modifiers are stored in the `Match.custom_modifiers` dictionary and persist for the entire match
 - Both types of modifiers are applied in `ImperialDuelGame.resolve_round()` after adjacency modifiers
 - Tracked in `RoundResult` for display purposes
-- Bounds checking ensures rolls stay within 1-6 range
+- Results may be lower than 1 or higher than 6 when modifiers are used
 
 ## Use Cases
 

@@ -110,7 +110,7 @@ def test_modifiers():
     assert result4.player2_modifier == -2, f"Expected player2 modifier to be -2, got {result4.player2_modifier}"
     
     # Test edge cases
-    print("\n5. Testing edge cases (rolls clamped to 1-6):")
+    print("\n5. Testing edge cases (no clamping):")
     # Force some specific rolls by testing multiple times
     for i in range(5):
         match.current_round = 1
@@ -124,10 +124,14 @@ def test_modifiers():
         
         result = game.resolve_round(match)
         print(f"   Test {i+1}: P1: {result.player1_roll} -> {result.player1_final_roll}, P2: {result.player2_roll} -> {result.player2_final_roll}")
-        
-        # Verify rolls are within bounds
-        assert 1 <= result.player1_final_roll <= 6, f"Player1 final roll {result.player1_final_roll} out of bounds"
-        assert 1 <= result.player2_final_roll <= 6, f"Player2 final roll {result.player2_final_roll} out of bounds"
+
+        # Verify modifiers were applied without clamping
+        assert result.player1_final_roll == result.player1_roll + 3, (
+            f"Player1 final roll {result.player1_final_roll} unexpected"
+        )
+        assert result.player2_final_roll == result.player2_roll - 3, (
+            f"Player2 final roll {result.player2_final_roll} unexpected"
+        )
 
     print("\n✅ All tests passed! Modifier functionality (match and round) is working correctly.")
 
