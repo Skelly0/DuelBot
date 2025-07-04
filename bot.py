@@ -1241,7 +1241,7 @@ async def handle_add_round_modifier(interaction: discord.Interaction, player: di
         embed.color = discord.Color.red()
     else:
         embed.description = f"**{player.display_name}**'s round modifier has been removed."
-        embed.color = discord.Color.light_gray()
+        embed.color = discord.Color.light_grey()
     
     embed.set_footer(text=f"Applied by {interaction.user.display_name}")
     
@@ -1301,7 +1301,7 @@ async def handle_add_match_modifier(interaction: discord.Interaction, player: di
         embed.color = discord.Color.red()
     else:
         embed.description = f"**{player.display_name}**'s match modifier has been removed."
-        embed.color = discord.Color.light_gray()
+        embed.color = discord.Color.light_grey()
     
     embed.set_footer(text=f"Applied by {interaction.user.display_name}")
     
@@ -1371,7 +1371,7 @@ async def handle_view_modifiers(interaction: discord.Interaction):
     
     if not has_match_modifiers and not has_round_modifiers:
         embed.description = "No active modifiers are currently applied."
-        embed.color = discord.Color.grey()
+        embed.color = discord.Color.light_grey()
     
     embed.set_footer(text=f"Requested by {interaction.user.display_name}")
     
