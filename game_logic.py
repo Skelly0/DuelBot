@@ -133,9 +133,9 @@ class ImperialDuelGame:
     def apply_adjacency_mod(self, roll: int, stance1: str, stance2: str) -> int:
         """Apply adjacency modifier to roll"""
         if self.are_stances_adjacent(stance1, stance2):
-            return max(1, min(6, roll + 1))
+            return roll + 1
         elif self.are_stances_opposite(stance1, stance2):
-            return max(1, min(6, roll - 1))
+            return roll - 1
         return roll
     
     def resolve_round(self, match: Match) -> RoundResult:
@@ -181,9 +181,9 @@ class ImperialDuelGame:
         custom_mod_applied = p1_modifier != 0 or p2_modifier != 0
         
         if p1_modifier != 0:
-            p1_final = max(1, min(6, p1_final + p1_modifier))
+            p1_final = p1_final + p1_modifier
         if p2_modifier != 0:
-            p2_final = max(1, min(6, p2_final + p2_modifier))
+            p2_final = p2_final + p2_modifier
         
         # Determine winner
         if p1_final > p2_final:
