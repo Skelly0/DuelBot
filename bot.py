@@ -45,10 +45,15 @@ class DuelBot(commands.Bot):
         self.settings = load_settings()
         self.chaurus_talent = self.settings.get('chaurus_talent', False)
         self.triple_stance_word = self.settings.get('triple_stance_word', '')
+        self.moderators = set(self.settings.get('moderators', []))
         
         # Match cleanup configuration
         self.MATCH_TIMEOUT_HOURS = 24  # Cleanup matches older than 24 hours
         self.INACTIVE_TIMEOUT_HOURS = 2  # Cleanup matches inactive for 2 hours
+
+    def is_moderator(self, user: discord.Member) -> bool:
+        """Return True if the user is considered a moderator."""
+        return user.guild_permissions.manage_messages or user.id in self.moderators
         
     async def setup_hook(self):
         """Called when the bot is starting up"""
@@ -1204,8 +1209,8 @@ async def handle_cancel(interaction: discord.Interaction):
 
 async def handle_end(interaction: discord.Interaction):
     """Handle end command (mods only)"""
-    # Check if user has manage messages permission (basic mod check)
-    if not interaction.user.guild_permissions.manage_messages:
+    # Check if user is a moderator (permission or listed ID)
+    if not bot.is_moderator(interaction.user):
         await interaction.response.send_message("Only moderators can force-end matches!", ephemeral=True)
         return
     
@@ -1230,8 +1235,8 @@ async def handle_end(interaction: discord.Interaction):
 
 async def handle_add_round_modifier(interaction: discord.Interaction, player: discord.Member, modifier: int):
     """Handle add round modifier command (mods only)"""
-    # Check if user has manage messages permission (basic mod check)
-    if not interaction.user.guild_permissions.manage_messages:
+    # Check if user is a moderator (permission or listed ID)
+    if not bot.is_moderator(interaction.user):
         await interaction.response.send_message("Only moderators can add modifiers!", ephemeral=True)
         return
     
@@ -1292,8 +1297,8 @@ async def handle_add_round_modifier(interaction: discord.Interaction, player: di
 
 async def handle_add_match_modifier(interaction: discord.Interaction, player: discord.Member, modifier: int):
     """Handle add match modifier command (mods only)"""
-    # Check if user has manage messages permission (basic mod check)
-    if not interaction.user.guild_permissions.manage_messages:
+    # Check if user is a moderator (permission or listed ID)
+    if not bot.is_moderator(interaction.user):
         await interaction.response.send_message("Only moderators can add modifiers!", ephemeral=True)
         return
     
@@ -1352,8 +1357,8 @@ async def handle_add_match_modifier(interaction: discord.Interaction, player: di
 
 async def handle_view_modifiers(interaction: discord.Interaction):
     """Handle view modifiers command (mods only)"""
-    # Check if user has manage messages permission (basic mod check)
-    if not interaction.user.guild_permissions.manage_messages:
+    # Check if user is a moderator (permission or listed ID)
+    if not bot.is_moderator(interaction.user):
         await interaction.response.send_message("Only moderators can view modifiers!", ephemeral=True)
         return
     
@@ -1425,7 +1430,7 @@ async def handle_view_modifiers(interaction: discord.Interaction):
 
 async def handle_chaurus_talent_toggle(interaction: discord.Interaction):
     """Handle Chaurus talent toggle (mods only)"""
-    if not interaction.user.guild_permissions.manage_messages:
+    if not bot.is_moderator(interaction.user):
         await interaction.response.send_message("Only moderators can toggle Chaurus talent!", ephemeral=True)
         return
 
@@ -1452,7 +1457,7 @@ async def handle_chaurus_talent_toggle(interaction: discord.Interaction):
 
 async def handle_triple_stance_toggle(interaction: discord.Interaction, word: str):
     """Handle triple stance toggle (mods only)"""
-    if not interaction.user.guild_permissions.manage_messages:
+    if not bot.is_moderator(interaction.user):
         await interaction.response.send_message("Only moderators can toggle triple stance!", ephemeral=True)
         return
 
