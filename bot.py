@@ -44,7 +44,7 @@ class DuelBot(commands.Bot):
         # Load persistent settings
         self.settings = load_settings()
         self.chaurus_talent = self.settings.get('chaurus_talent', False)
-        self.triple_stance_word = self.settings.get('triple_stance_word', '')
+        self.triple_stance_role_id = int(self.settings.get('triple_stance_role_id', 0))
         self.moderators = set(self.settings.get('moderators', []))
         
         # Match cleanup configuration
@@ -200,7 +200,7 @@ async def help_command(interaction: discord.Interaction):
             "`/add_match_modifier @player modifier` - Add dice roll modifier for the entire match (-3 to +3)\n"
             "`/view_modifiers` - View active dice roll modifiers\n"
             "`/chaurus_talent_toggle` - Toggle +1 bonus for 'Chaurus' nicknames (persistent)\n"
-            "`/triple_stance_toggle word` - Allow names containing `word` to declare three stances"
+            "`/triple_stance_toggle role_id` - Allow members with the role to declare three stances"
         ),
         inline=False
     )
@@ -583,11 +583,11 @@ async def chaurus_talent_toggle_command(interaction: discord.Interaction):
     """Toggle the Chaurus talent bonus (mods only)"""
     await handle_chaurus_talent_toggle(interaction)
 
-@bot.tree.command(name="triple_stance_toggle", description="Toggle triple stance word (moderators only)")
-@app_commands.describe(word="Word that allows declaring three stances")
-async def triple_stance_toggle_command(interaction: discord.Interaction, word: str):
-    """Toggle triple stance ability for specified word (mods only)"""
-    await handle_triple_stance_toggle(interaction, word)
+@bot.tree.command(name="triple_stance_toggle", description="Toggle triple stance role (moderators only)")
+@app_commands.describe(role_id="Role ID that allows declaring three stances, or 'off'")
+async def triple_stance_toggle_command(interaction: discord.Interaction, role_id: str):
+    """Toggle triple stance ability for specified role (mods only)"""
+    await handle_triple_stance_toggle(interaction, role_id)
 
 # ============================================================================
 # COMMAND HANDLERS (unchanged from original)
@@ -632,7 +632,7 @@ async def handle_challenge(interaction: discord.Interaction, opponent: discord.M
             adjacency_mod=adjacency_mod,
             bait_switch=bait_switch,
             chaurus_talent=bot.chaurus_talent,
-            triple_stance_word=bot.triple_stance_word
+            triple_stance_role_id=bot.triple_stance_role_id
         )
         
         # Store match and timestamp
@@ -744,8 +744,9 @@ async def handle_stance_declaration(interaction: discord.Interaction, first: str
                 return
 
         can_declare_three = False
-        if match.triple_stance_word and match.triple_stance_word.lower() in player.username.lower():
-            can_declare_three = True
+        if match.triple_stance_role_id:
+            if any(r.id == match.triple_stance_role_id for r in interaction.user.roles):
+                can_declare_three = True
 
         if third and not can_declare_three:
             await interaction.response.send_message("You are not allowed to declare a third stance!", ephemeral=True)
@@ -1138,10 +1139,10 @@ async def handle_status(interaction: discord.Interaction):
     embed.add_field(name="Round", value=str(match.current_round), inline=True)
     embed.add_field(name="Format", value=f"Best of {match.best_of}", inline=True)
     embed.add_field(name="State", value=match.state.value.replace('_', ' ').title(), inline=True)
-    if match.triple_stance_word:
+    if match.triple_stance_role_id:
         embed.add_field(
             name="Triple Stance",
-            value=f"Names containing '{match.triple_stance_word}' may declare 3 stances",
+            value=f"Members with <@&{match.triple_stance_role_id}> may declare 3 stances",
             inline=False
         )
     
@@ -1415,9 +1416,9 @@ async def handle_view_modifiers(interaction: discord.Interaction):
     status = "Enabled" if getattr(match, 'chaurus_talent', False) else "Disabled"
     embed.add_field(name="Chaurus Talent", value=status, inline=False)
 
-    stance_status = match.triple_stance_word if getattr(match, 'triple_stance_word', '') else "Disabled"
+    stance_status = str(match.triple_stance_role_id) if getattr(match, 'triple_stance_role_id', 0) else "Disabled"
     if stance_status != "Disabled":
-        stance_status = f"Enabled for '{stance_status}'"
+        stance_status = f"Enabled for <@&{stance_status}>"
     embed.add_field(name="Triple Stance", value=stance_status, inline=False)
     
     if not has_match_modifiers and not has_round_modifiers:
@@ -1455,26 +1456,30 @@ async def handle_chaurus_talent_toggle(interaction: discord.Interaction):
 
     await interaction.response.send_message(embed=embed)
 
-async def handle_triple_stance_toggle(interaction: discord.Interaction, word: str):
+async def handle_triple_stance_toggle(interaction: discord.Interaction, role_id: str):
     """Handle triple stance toggle (mods only)"""
     if not bot.is_moderator(interaction.user):
         await interaction.response.send_message("Only moderators can toggle triple stance!", ephemeral=True)
         return
 
-    normalized = word.strip().lower()
+    normalized = role_id.strip().lower()
     if normalized in ["off", "none", "disable", ""]:
-        bot.triple_stance_word = ""
+        bot.triple_stance_role_id = 0
     else:
-        bot.triple_stance_word = normalized
+        try:
+            bot.triple_stance_role_id = int(''.join(filter(str.isdigit, normalized)))
+        except ValueError:
+            await interaction.response.send_message("Invalid role ID!", ephemeral=True)
+            return
 
-    bot.settings['triple_stance_word'] = bot.triple_stance_word
+    bot.settings['triple_stance_role_id'] = bot.triple_stance_role_id
     save_settings(bot.settings)
 
     for m in list(bot.active_matches.values()):
-        m.triple_stance_word = bot.triple_stance_word
+        m.triple_stance_role_id = bot.triple_stance_role_id
 
-    if bot.triple_stance_word:
-        desc = f"Players with '{bot.triple_stance_word}' in their name may declare three stances."
+    if bot.triple_stance_role_id:
+        desc = f"Members with <@&{bot.triple_stance_role_id}> may declare three stances."
         color = discord.Color.green()
     else:
         desc = "Triple stance ability disabled."
