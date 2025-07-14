@@ -4,6 +4,7 @@ import os
 SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'settings.json')
 DEFAULT_SETTINGS = {
     'chaurus_talent': False,
+    'triple_stance_word': ''
 }
 
 def load_settings() -> dict:

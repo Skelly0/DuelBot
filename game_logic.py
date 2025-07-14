@@ -60,6 +60,7 @@ class Match:
     adjacency_mod: bool = False
     bait_switch: bool = False
     chaurus_talent: bool = False
+    triple_stance_word: str = ''
     round_history: List[RoundResult] = field(default_factory=list)
     last_stances: Dict[int, str] = field(default_factory=dict)  # user_id -> last stance used
     custom_modifiers: Dict[int, int] = field(default_factory=dict)  # user_id -> modifier value (match-wide)
