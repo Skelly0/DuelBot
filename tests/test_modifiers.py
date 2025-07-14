@@ -178,7 +178,28 @@ def test_settings_persistence():
     settings['chaurus_talent'] = original
     save_settings(settings)
 
+def test_triple_stance_word():
+    """Test triple stance word functionality"""
+    print("\n8. Testing triple stance word:")
+    game = ImperialDuelGame()
+
+    player1 = Player(user_id=1, username="TripleHero")
+    player2 = Player(user_id=2, username="Opponent")
+
+    match = Match(
+        channel_id=555,
+        player1=player1,
+        player2=player2,
+        best_of=3,
+        state=GameState.DECLARING_STANCES,
+        triple_stance_word="triple"
+    )
+
+    player1.declared_stances = ["Bagr", "Radae", "Darda"]
+    assert len(player1.declared_stances) == 3, "Player should be able to declare three stances"
+
 if __name__ == "__main__":
     test_modifiers()
     test_chaurus_talent()
     test_settings_persistence()
+    test_triple_stance_word()

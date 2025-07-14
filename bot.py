@@ -44,6 +44,7 @@ class DuelBot(commands.Bot):
         # Load persistent settings
         self.settings = load_settings()
         self.chaurus_talent = self.settings.get('chaurus_talent', False)
+        self.triple_stance_word = self.settings.get('triple_stance_word', '')
         
         # Match cleanup configuration
         self.MATCH_TIMEOUT_HOURS = 24  # Cleanup matches older than 24 hours
@@ -193,7 +194,8 @@ async def help_command(interaction: discord.Interaction):
             "`/add_round_modifier @player modifier` - Add dice roll modifier for the current round (-3 to +3)\n"
             "`/add_match_modifier @player modifier` - Add dice roll modifier for the entire match (-3 to +3)\n"
             "`/view_modifiers` - View active dice roll modifiers\n"
-            "`/chaurus_talent_toggle` - Toggle +1 bonus for 'Chaurus' nicknames (persistent)"
+            "`/chaurus_talent_toggle` - Toggle +1 bonus for 'Chaurus' nicknames (persistent)\n"
+            "`/triple_stance_toggle word` - Allow names containing `word` to declare three stances"
         ),
         inline=False
     )
@@ -377,21 +379,24 @@ async def accept_command(interaction: discord.Interaction):
 # DECLARE COMMAND
 # ============================================================================
 
-@bot.tree.command(name="declare", description="Declare your two stance options for the round")
+@bot.tree.command(name="declare", description="Declare your stance options for the round")
 @app_commands.describe(
     first="Your first stance option",
-    second="Your second stance option"
+    second="Your second stance option",
+    third="(Optional) Third stance if allowed"
 )
 async def declare_command(
     interaction: discord.Interaction,
     first: str,
-    second: str
+    second: str,
+    third: Optional[str] = None
 ):
-    """Declare two stance options"""
-    await handle_stance_declaration(interaction, first, second)
+    """Declare stance options"""
+    await handle_stance_declaration(interaction, first, second, third)
 
 @declare_command.autocomplete('first')
 @declare_command.autocomplete('second')
+@declare_command.autocomplete('third')
 async def declare_stance_autocomplete(interaction: discord.Interaction, current: str):
     start_time = time.time()
     try:
@@ -573,6 +578,12 @@ async def chaurus_talent_toggle_command(interaction: discord.Interaction):
     """Toggle the Chaurus talent bonus (mods only)"""
     await handle_chaurus_talent_toggle(interaction)
 
+@bot.tree.command(name="triple_stance_toggle", description="Toggle triple stance word (moderators only)")
+@app_commands.describe(word="Word that allows declaring three stances")
+async def triple_stance_toggle_command(interaction: discord.Interaction, word: str):
+    """Toggle triple stance ability for specified word (mods only)"""
+    await handle_triple_stance_toggle(interaction, word)
+
 # ============================================================================
 # COMMAND HANDLERS (unchanged from original)
 # ============================================================================
@@ -615,7 +626,8 @@ async def handle_challenge(interaction: discord.Interaction, opponent: discord.M
             no_repeat=no_repeat,
             adjacency_mod=adjacency_mod,
             bait_switch=bait_switch,
-            chaurus_talent=bot.chaurus_talent
+            chaurus_talent=bot.chaurus_talent,
+            triple_stance_word=bot.triple_stance_word
         )
         
         # Store match and timestamp
@@ -670,21 +682,24 @@ async def handle_accept(interaction: discord.Interaction):
     embed.add_field(name="Options", value=format_options(match.no_repeat, match.adjacency_mod, match.bait_switch), inline=True)
     embed.add_field(name="Round", value=f"{match.current_round}", inline=True)
     embed.add_field(name="Score", value=f"{match.player1.username}: {match.player1.score} | {match.player2.username}: {match.player2.score}", inline=False)
-    embed.add_field(name="Next Step", value="Both players declare two stances using `/declare first second`", inline=False)
+    embed.add_field(name="Next Step", value="Both players declare stances using `/declare`", inline=False)
     
     await interaction.response.send_message(embed=embed)
 
-async def handle_stance_declaration(interaction: discord.Interaction, first: str, second: str):
+async def handle_stance_declaration(interaction: discord.Interaction, first: str, second: str, third: Optional[str] = None):
     """Handle stance declaration"""
     if not first or not second:
-        await interaction.response.send_message("You must specify both first and second stances!", ephemeral=True)
+        await interaction.response.send_message("You must specify at least two stances!", ephemeral=True)
         return
-    
-    if not bot.game.validate_stance(first) or not bot.game.validate_stance(second):
+
+    if not bot.game.validate_stance(first) or not bot.game.validate_stance(second) or (third and not bot.game.validate_stance(third)):
         await interaction.response.send_message(f"Invalid stance! Valid stances: {', '.join(bot.game.STANCES)}", ephemeral=True)
         return
-    
-    if first == second:
+
+    duplicates = [first, second]
+    if third:
+        duplicates.append(third)
+    if len(set(duplicates)) != len(duplicates):
         await interaction.response.send_message("You cannot declare the same stance twice!", ephemeral=True)
         return
     
@@ -716,12 +731,26 @@ async def handle_stance_declaration(interaction: discord.Interaction, first: str
         # Check no_repeat rule
         if match.no_repeat:
             last_stance = match.last_stances.get(user_id)
-            if last_stance in [first, second]:
+            choices = [first, second]
+            if third:
+                choices.append(third)
+            if last_stance in choices:
                 await interaction.response.send_message(f"You cannot use {last_stance} again (no-repeat rule)!", ephemeral=True)
                 return
-        
+
+        can_declare_three = False
+        if match.triple_stance_word and match.triple_stance_word.lower() in player.username.lower():
+            can_declare_three = True
+
+        if third and not can_declare_three:
+            await interaction.response.send_message("You are not allowed to declare a third stance!", ephemeral=True)
+            return
+
         # Set declared stances
-        player.declared_stances = [first, second]
+        if third and can_declare_three:
+            player.declared_stances = [first, second, third]
+        else:
+            player.declared_stances = [first, second]
         
         # Check if both players have declared
         both_declared = match.player1.declared_stances and match.player2.declared_stances
@@ -730,7 +759,10 @@ async def handle_stance_declaration(interaction: discord.Interaction, first: str
             logger.info(f"Both players declared stances in channel {channel_id}, moving to picking phase")
     
     # Send secret confirmation to the player
-    await interaction.response.send_message(f"✅ You secretly declared: **{first}** and **{second}**", ephemeral=True)
+    if third and third in player.declared_stances:
+        await interaction.response.send_message(f"✅ You secretly declared: **{first}**, **{second}**, and **{third}**", ephemeral=True)
+    else:
+        await interaction.response.send_message(f"✅ You secretly declared: **{first}** and **{second}**", ephemeral=True)
     
     # Send public notification that player has declared (without revealing stances)
     await interaction.followup.send(f"🔒 **{interaction.user.display_name}** has locked in their stance declaration!")
@@ -1101,6 +1133,12 @@ async def handle_status(interaction: discord.Interaction):
     embed.add_field(name="Round", value=str(match.current_round), inline=True)
     embed.add_field(name="Format", value=f"Best of {match.best_of}", inline=True)
     embed.add_field(name="State", value=match.state.value.replace('_', ' ').title(), inline=True)
+    if match.triple_stance_word:
+        embed.add_field(
+            name="Triple Stance",
+            value=f"Names containing '{match.triple_stance_word}' may declare 3 stances",
+            inline=False
+        )
     
     if match.state == GameState.DECLARING_STANCES:
         declared = []
@@ -1371,6 +1409,11 @@ async def handle_view_modifiers(interaction: discord.Interaction):
     # Show Chaurus talent status
     status = "Enabled" if getattr(match, 'chaurus_talent', False) else "Disabled"
     embed.add_field(name="Chaurus Talent", value=status, inline=False)
+
+    stance_status = match.triple_stance_word if getattr(match, 'triple_stance_word', '') else "Disabled"
+    if stance_status != "Disabled":
+        stance_status = f"Enabled for '{stance_status}'"
+    embed.add_field(name="Triple Stance", value=stance_status, inline=False)
     
     if not has_match_modifiers and not has_round_modifiers:
         embed.description = "No active modifiers are currently applied."
@@ -1402,6 +1445,40 @@ async def handle_chaurus_talent_toggle(interaction: discord.Interaction):
         title="✨ Chaurus Talent Toggled",
         description=f"Chaurus talent is now **{status}**.",
         color=discord.Color.green() if bot.chaurus_talent else discord.Color.red()
+    )
+    embed.set_footer(text=f"Toggled by {interaction.user.display_name}")
+
+    await interaction.response.send_message(embed=embed)
+
+async def handle_triple_stance_toggle(interaction: discord.Interaction, word: str):
+    """Handle triple stance toggle (mods only)"""
+    if not interaction.user.guild_permissions.manage_messages:
+        await interaction.response.send_message("Only moderators can toggle triple stance!", ephemeral=True)
+        return
+
+    normalized = word.strip().lower()
+    if normalized in ["off", "none", "disable", ""]:
+        bot.triple_stance_word = ""
+    else:
+        bot.triple_stance_word = normalized
+
+    bot.settings['triple_stance_word'] = bot.triple_stance_word
+    save_settings(bot.settings)
+
+    for m in list(bot.active_matches.values()):
+        m.triple_stance_word = bot.triple_stance_word
+
+    if bot.triple_stance_word:
+        desc = f"Players with '{bot.triple_stance_word}' in their name may declare three stances."
+        color = discord.Color.green()
+    else:
+        desc = "Triple stance ability disabled."
+        color = discord.Color.red()
+
+    embed = discord.Embed(
+        title="✨ Triple Stance Toggled",
+        description=desc,
+        color=color
     )
     embed.set_footer(text=f"Toggled by {interaction.user.display_name}")
 
