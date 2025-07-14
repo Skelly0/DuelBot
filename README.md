@@ -30,6 +30,9 @@ A Discord bot that runs the six-stance dueling mini-game via slash commands, han
    # Edit .env and add your DISCORD_TOKEN
    ```
 
+   To grant additional users moderator privileges without Discord permissions,
+   edit `settings.json` and add their user IDs to the `moderators` list.
+
 4. **Invite bot to server**:
    - Generate invite URL with `applications.commands` scope
    - Ensure bot has permission to send messages and use slash commands

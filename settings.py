@@ -4,7 +4,8 @@ import os
 SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'settings.json')
 DEFAULT_SETTINGS = {
     'chaurus_talent': False,
-    'triple_stance_word': ''
+    'triple_stance_word': '',
+    'moderators': []
 }
 
 def load_settings() -> dict:
@@ -18,6 +19,13 @@ def load_settings() -> dict:
         data = DEFAULT_SETTINGS.copy()
     for key, value in DEFAULT_SETTINGS.items():
         data.setdefault(key, value)
+
+    # Ensure moderators is a list of integers
+    if isinstance(data.get('moderators'), list):
+        data['moderators'] = [int(m) for m in data['moderators']]
+    else:
+        data['moderators'] = []
+
     return data
 
 def save_settings(settings: dict) -> None:
