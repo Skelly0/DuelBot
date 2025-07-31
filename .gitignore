@@ -83,3 +83,5 @@ data/
 *.db
 *.sqlite
 *.sqlite3
+settings.json
+settings.json
