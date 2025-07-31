@@ -192,10 +192,11 @@ def test_triple_stance_role():
         player2=player2,
         best_of=3,
         state=GameState.DECLARING_STANCES,
-        triple_stance_role_id=123
+        triple_stance_role_ids=[123, 456]
     )
 
     player1.declared_stances = ["Bagr", "Radae", "Darda"]
+    assert len(match.triple_stance_role_ids) == 2, "Multiple roles should be allowed"
     assert len(player1.declared_stances) == 3, "Player should be able to declare three stances"
 
 if __name__ == "__main__":
