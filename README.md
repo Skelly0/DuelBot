@@ -77,7 +77,10 @@ Force-end a match (moderators only).
 Toggle a persistent +1 roll bonus for players with "Chaurus" in their nickname (moderators only).
 
 ### `/duel triple_stance_toggle role_id`
-Allow members with the specified role to declare three stances instead of two (moderators only).
+Toggle triple stance ability for the specified role. Running the command again with the same role removes it (moderators only).
+
+### `/duel triple_stance_roles`
+List all roles currently allowed to declare three stances (moderators only).
 
 ## Game Rules
 
